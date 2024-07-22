@@ -189,7 +189,7 @@ async def about(callback: types.CallbackQuery):
 # RETURN CALLBACKS
 @router.callback_query(F.data == 'to_main')
 async def to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.START_ANSWER, reply_markup=kb.main)
+    await callback.message.edit_text(text=answers.START_ANSWER, parse_mode='html', reply_markup=kb.main)
 
 @router.callback_query(F.data == 'to_additional')
 async def to_additional(callback: types.CallbackQuery):
