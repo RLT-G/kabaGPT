@@ -1,6 +1,6 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton 
-
+import config
 
 
 
@@ -16,11 +16,11 @@ main = InlineKeyboardMarkup(
 async def get_dialogues_markup(button_texts):
     dialogues = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=button_texts[0], callback_data='dialog_1')],
-            [InlineKeyboardButton(text=button_texts[1], callback_data='dialog_2')],
-            [InlineKeyboardButton(text=button_texts[2], callback_data='dialog_3')],
-            [InlineKeyboardButton(text=button_texts[3], callback_data='dialog_4')],
-            [InlineKeyboardButton(text=button_texts[4], callback_data='dialog_5')],
+            [InlineKeyboardButton(text=f"🟢 {button_texts[0]}", callback_data='dialog_1')],
+            [InlineKeyboardButton(text=f"🔵 {button_texts[1]}", callback_data='dialog_2')],
+            [InlineKeyboardButton(text=f"🟣 {button_texts[2]}", callback_data='dialog_3')],
+            [InlineKeyboardButton(text=f"🟤 {button_texts[3]}", callback_data='dialog_4')],
+            [InlineKeyboardButton(text=f"🟠 {button_texts[4]}", callback_data='dialog_5')],
             [InlineKeyboardButton(text='Назад ⬅', callback_data='to_main')],
         ]
     )
@@ -74,7 +74,7 @@ info = InlineKeyboardMarkup(
 # ------------------------------ DIALOGUE ------------------------------ #
 dialogue_1 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_1')],
+        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_1'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_1')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_1'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_1')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -82,7 +82,7 @@ dialogue_1 = InlineKeyboardMarkup(
 
 dialogue_2 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_2')],
+        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_2'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_2')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_2'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_2')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -90,7 +90,7 @@ dialogue_2 = InlineKeyboardMarkup(
 
 dialogue_3 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_3')],
+        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_3'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_3')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_3'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_3')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -98,7 +98,7 @@ dialogue_3 = InlineKeyboardMarkup(
 
 dialogue_4 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_4')],
+        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_4'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_4')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_4'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_4')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -106,9 +106,18 @@ dialogue_4 = InlineKeyboardMarkup(
 
 dialogue_5 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_5')],
+        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_5'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_5')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_5'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_5')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
 )
+
+async def get_models_markup(dialogue_number: int):
+    marlup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='gpt-4o-mini', callback_data=f"set gpt-4o-mini to dialogue_{dialogue_number}")],
+            [InlineKeyboardButton(text='gpt-4o', callback_data=f"set gpt-4o to dialogue_{dialogue_number}")],
+        ]
+    )
+    return marlup
 # ------------------------------ DIALOGUE ------------------------------ #

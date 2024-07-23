@@ -1,10 +1,18 @@
+from dotenv import load_dotenv
+import openai
+import os
+
+load_dotenv()
+
 DEBUG = False
 
-BOT_TOKEN = '6854772852:AAHbrfYB679Y-oGVoVikwS5qIZ9BGicqH_s'
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 
-OPAENAI_TOKEN = ''
+OPAENAI_TOKEN = os.getenv('OPAENAI_TOKEN')
 
-DB_PATH = ''
+# openai.api_key = OPAENAI_TOKEN
+
+DB_PATH = os.getenv('DB_PATH')
 
 DEFAULT_FIRST_PROMT = """
 Follow in the strict order:
@@ -36,3 +44,5 @@ You MUST follow the instructions for answering:
 """
 
 DEFAULT_DIALOGUE_TITLES = "Диалог 1&#13Диалог 2&#13Диалог 3&#13Диалог 4&#13Диалог 5" # &#13 - sep
+
+DEFAULT_DIALOGUE_MODELS = "gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini" # &#13 - sep

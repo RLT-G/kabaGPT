@@ -86,6 +86,22 @@ async def set_dialogue_title(id: int, dialogue_title: str, dialogue_index: int) 
             await session.commit()
 
 
+async def set_model_to_dialogue(id: int, dialogue_index: int, model: str) -> None:
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+
+        if user:
+            dialogue_models = str(user.dialogue_models).split('&#13')
+            dialogue_models[dialogue_index] = model
+            dialogue_models_for_db = "&#13".join(dialogue_models)
+
+            await session.execute(update(User).where(User.id == id).values(
+                dialogue_models=dialogue_models_for_db 
+            ))
+            await session.commit()
+
+
 async def get_button_texts(id: int, dialogue_index: int = -1):
     async with async_session() as session:
         result = await session.execute(select(User).where(User.id == id))
@@ -96,3 +112,16 @@ async def get_button_texts(id: int, dialogue_index: int = -1):
                 return str(user.dialog_titles).split('&#13')[dialogue_index]
             
             return str(user.dialog_titles).split('&#13')
+        
+
+async def get_dialogue_models(id: int, model_index: int = -1):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+
+        if user:
+            if model_index != -1:
+                return str(user.dialogue_models).split('&#13')[model_index]
+            
+            return str(user.dialogue_models).split('&#13')
+        

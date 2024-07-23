@@ -10,7 +10,9 @@ from database.query import (
     set_first_promt,
     set_second_promt,
     get_button_texts,
-    set_dialogue_title
+    get_dialogue_models,
+    set_dialogue_title,
+    set_model_to_dialogue
 )
 
 import app.keyboards as kb
@@ -29,22 +31,27 @@ class SetSecondPromt(StatesGroup):
 class Dialogue_1(StatesGroup):
     dialog = State()
     change_name = State()
+    change_model = State()
 
 class Dialogue_2(StatesGroup):
     dialog = State()
     change_name = State()
+    change_model = State()
 
 class Dialogue_3(StatesGroup):
     dialog = State()
     change_name = State()
+    change_model = State()
 
 class Dialogue_4(StatesGroup):
     dialog = State()
     change_name = State()
+    change_model = State()
 
 class Dialogue_5(StatesGroup):
     dialog = State()
     change_name = State()
+    change_model = State()
 
 
 # COMMANDS
@@ -105,57 +112,101 @@ async def set_default_settings(callback: types.CallbackQuery):
 @router.callback_query(F.data == 'dialog_1')
 async def dialog_1(callback: types.CallbackQuery, state: FSMContext):
     dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
     await state.set_state(Dialogue_1.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_1)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
 
 @router.callback_query(F.data == 'change_name_1')
 async def change_name_1(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_1.change_name)
     await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
 
+@router.callback_query(F.data == 'change_model_1')
+async def change_model_1(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Dialogue_1.change_model)
+    markup = await kb.get_models_markup(dialogue_number=1)
+    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+
 @router.callback_query(F.data == 'dialog_2')
 async def dialog_2(callback: types.CallbackQuery, state: FSMContext):
     dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
     await state.set_state(Dialogue_2.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_2)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
 
 @router.callback_query(F.data == 'change_name_2')
 async def change_name_2(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_2.change_name)
     await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
 
+@router.callback_query(F.data == 'change_model_2')
+async def change_model_2(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Dialogue_2.change_model)
+    markup = await kb.get_models_markup(dialogue_number=2)
+    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+
 @router.callback_query(F.data == 'dialog_3')
 async def dialog_3(callback: types.CallbackQuery, state: FSMContext):
     dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
     await state.set_state(Dialogue_3.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_3)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
 
 @router.callback_query(F.data == 'change_name_3')
 async def change_name_3(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_3.change_name)
     await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
 
+@router.callback_query(F.data == 'change_model_3')
+async def change_model_3(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Dialogue_3.change_model)
+    markup = await kb.get_models_markup(dialogue_number=3)
+    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+
 @router.callback_query(F.data == 'dialog_4')
 async def dialog_4(callback: types.CallbackQuery, state: FSMContext):
     dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
     await state.set_state(Dialogue_4.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_4)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
 
 @router.callback_query(F.data == 'change_name_4')
 async def change_name_4(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_4.change_name)
     await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
 
+@router.callback_query(F.data == 'change_model_4')
+async def change_model_4(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Dialogue_4.change_model)
+    markup = await kb.get_models_markup(dialogue_number=4)
+    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+
 @router.callback_query(F.data == 'dialog_5')
 async def dialog_5(callback: types.CallbackQuery, state: FSMContext):
     dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
     await state.set_state(Dialogue_5.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_5)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
 
 @router.callback_query(F.data == 'change_name_5')
 async def change_name_5(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_5.change_name)
     await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
+
+@router.callback_query(F.data == 'change_model_5')
+async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Dialogue_5.change_model)
+    markup = await kb.get_models_markup(dialogue_number=5)
+    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+
+
+@router.callback_query(F.data == 'history_1' or F.data == 'history_2' or F.data == 'history_3' or F.data == 'history_4' or F.data == 'history_5')
+async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer(text="История сообщений пуста")
+
+@router.callback_query(F.data == 'del_history_1' or F.data == 'del_history_2' or F.data == 'del_history_3' or F.data == 'del_history_4' or F.data == 'del_history_5')
+async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.answer(text="История сообщений отчищена")
 # ------------------------------ DIALOGUE ------------------------------ #
 
 
@@ -206,23 +257,23 @@ async def to_dialogues(callback: types.CallbackQuery, state: FSMContext):
 # ------------------------------ DIALOGUES FSM ------------------------------ #
 @router.message(Dialogue_1.dialog)
 async def fsm_dialogue_1(message: types.Message, state: FSMContext):
-    await message.answer(text=message.text)
+    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_2.dialog)
 async def fsm_dialogue_2(message: types.Message, state: FSMContext):
-    await message.answer(text=message.text)
+    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_3.dialog)
 async def fsm_dialogue_3(message: types.Message, state: FSMContext):
-    await message.answer(text=message.text)
+    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_4.dialog)
 async def fsm_dialogue_4(message: types.Message, state: FSMContext):
-    await message.answer(text=message.text)
+    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_5.dialog)
 async def fsm_dialogue_5(message: types.Message, state: FSMContext):
-    await message.answer(text=message.text)
+    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
 # ------------------------------ DIALOGUES FSM ------------------------------ #
 
 
@@ -266,11 +317,12 @@ async def fsm_set_dialog_1_title(message: types.Message, state: FSMContext):
     await state.update_data(change_name=message.text)
     data = await state.get_data()
     dialogue_title = data.get('change_name', '')
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
     await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=0)
     await state.clear()
     await message.answer(text=answers.SETTINGS_APPLIED)
     await state.set_state(Dialogue_1.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_1)
+    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
 
 
 @router.message(Dialogue_2.change_name)
@@ -278,11 +330,12 @@ async def fsm_set_dialog_2_title(message: types.Message, state: FSMContext):
     await state.update_data(change_name=message.text)
     data = await state.get_data()
     dialogue_title = data.get('change_name', '')
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
     await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=1)
     await state.clear()
     await message.answer(text=answers.SETTINGS_APPLIED)
     await state.set_state(Dialogue_2.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_2)
+    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
 
 
 @router.message(Dialogue_3.change_name)
@@ -290,11 +343,12 @@ async def fsm_set_dialog_3_title(message: types.Message, state: FSMContext):
     await state.update_data(change_name=message.text)
     data = await state.get_data()
     dialogue_title = data.get('change_name', '')
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
     await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=2)
     await state.clear()
     await message.answer(text=answers.SETTINGS_APPLIED)
     await state.set_state(Dialogue_3.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_3)
+    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
 
 
 @router.message(Dialogue_4.change_name)
@@ -302,11 +356,12 @@ async def fsm_set_dialog_4_title(message: types.Message, state: FSMContext):
     await state.update_data(change_name=message.text)
     data = await state.get_data()
     dialogue_title = data.get('change_name', '')
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
     await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=3)
     await state.clear()
     await message.answer(text=answers.SETTINGS_APPLIED)
     await state.set_state(Dialogue_4.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_4)
+    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
 
 
 @router.message(Dialogue_5.change_name)
@@ -314,9 +369,112 @@ async def fsm_set_dialog_5_title(message: types.Message, state: FSMContext):
     await state.update_data(change_name=message.text)
     data = await state.get_data()
     dialogue_title = data.get('change_name', '')
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
     await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=4)
     await state.clear()
     await message.answer(text=answers.SETTINGS_APPLIED)
     await state.set_state(Dialogue_5.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title), parse_mode='html', reply_markup=kb.dialogue_5)
+    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
+
+
+
+# SET MODELS
+@router.callback_query(F.data == 'set gpt-4o to dialogue_1')
+async def set_gpt_4o_to_dialogue_1(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=0, model='gpt-4o')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
+    await state.set_state(Dialogue_1.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
+
+
+@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_1')
+async def set_gpt_4o_mini_to_dialogue_1(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=0, model='gpt-4o-mini')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
+    await state.set_state(Dialogue_1.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
+
+
+@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_2')
+async def set_gpt_4o_mini_to_dialogue_2(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=1, model='gpt-4o-mini')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=1), '')
+    await state.set_state(Dialogue_2.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
+
+
+@router.callback_query(F.data == 'set gpt-4o to dialogue_2')
+async def set_gpt_4o_to_dialogue_2(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=1, model='gpt-4o')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=1), '')
+    await state.set_state(Dialogue_2.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
+
+
+@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_3')
+async def set_gpt_4o_mini_to_dialogue_3(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=2, model='gpt-4o-mini')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=2), '')
+    await state.set_state(Dialogue_3.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
+
+
+@router.callback_query(F.data == 'set gpt-4o to dialogue_3')
+async def set_gpt_4o_to_dialogue_3(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=2, model='gpt-4o')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=2), '')
+    await state.set_state(Dialogue_3.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
+
+
+@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_4')
+async def set_gpt_4o_mini_to_dialogue_4(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=3, model='gpt-4o-mini')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=3), '')
+    await state.set_state(Dialogue_4.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
+
+
+@router.callback_query(F.data == 'set gpt-4o to dialogue_4')
+async def set_gpt_4o_to_dialogue_4(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=3, model='gpt-4o')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=3), '')
+    await state.set_state(Dialogue_4.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
+
+
+@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_5')
+async def set_gpt_4o_mini_to_dialogue_5(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=4, model='gpt-4o-mini')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=4), '')
+    await state.set_state(Dialogue_5.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
+
+
+@router.callback_query(F.data == 'set gpt-4o to dialogue_5')
+async def set_gpt_4o_to_dialogue_5(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=4, model='gpt-4o')
+    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
+    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=4), '')
+    await state.set_state(Dialogue_5.dialog)
+    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
 # ------------------------------ OTHER FSM ------------------------------ #

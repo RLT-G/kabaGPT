@@ -21,7 +21,7 @@ class User(Base):
     first_promt: Mapped[str] = mapped_column(Text(2048), unique=False)
     second_promt: Mapped[str] = mapped_column(Text(2048), unique=False)
     dialog_titles: Mapped[str] = mapped_column(String(1024), default='Диалог 1&#13Диалог 2&#13Диалог 3&#13Диалог 4&#13Диалог 5')
-    dialogue_models: Mapped[str] = mapped_column(String(512), default='GPT4mini&#13GPT4mini&#13GPT4mini&#13GPT4mini&#13GPT4mini')
+    dialogue_models: Mapped[str] = mapped_column(String(512), default='gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini')
     
 
 async def async_main():
