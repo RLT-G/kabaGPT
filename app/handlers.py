@@ -125,7 +125,7 @@ async def change_name_1(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_1(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_1.change_model)
     markup = await kb.get_models_markup(dialogue_number=1)
-    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_2')
 async def dialog_2(callback: types.CallbackQuery, state: FSMContext):
@@ -143,7 +143,7 @@ async def change_name_2(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_2(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_2.change_model)
     markup = await kb.get_models_markup(dialogue_number=2)
-    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_3')
 async def dialog_3(callback: types.CallbackQuery, state: FSMContext):
@@ -161,7 +161,7 @@ async def change_name_3(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_3(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_3.change_model)
     markup = await kb.get_models_markup(dialogue_number=3)
-    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_4')
 async def dialog_4(callback: types.CallbackQuery, state: FSMContext):
@@ -179,7 +179,7 @@ async def change_name_4(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_4(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_4.change_model)
     markup = await kb.get_models_markup(dialogue_number=4)
-    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_5')
 async def dialog_5(callback: types.CallbackQuery, state: FSMContext):
@@ -197,14 +197,21 @@ async def change_name_5(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_5.change_model)
     markup = await kb.get_models_markup(dialogue_number=5)
-    await callback.message.edit_text(text="Выберите модель", reply_markup=markup)
+    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
 
-
-@router.callback_query(F.data == 'history_1' or F.data == 'history_2' or F.data == 'history_3' or F.data == 'history_4' or F.data == 'history_5')
+@router.callback_query(F.data == 'history_1')
+@router.callback_query(F.data == 'history_2')
+@router.callback_query(F.data == 'history_3')
+@router.callback_query(F.data == 'history_4')
+@router.callback_query(F.data == 'history_5')
 async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(text="История сообщений пуста")
 
-@router.callback_query(F.data == 'del_history_1' or F.data == 'del_history_2' or F.data == 'del_history_3' or F.data == 'del_history_4' or F.data == 'del_history_5')
+@router.callback_query(F.data == 'del_history_1')
+@router.callback_query(F.data == 'del_history_2')
+@router.callback_query(F.data == 'del_history_3')
+@router.callback_query(F.data == 'del_history_4')
+@router.callback_query(F.data == 'del_history_5')
 async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(text="История сообщений отчищена")
 # ------------------------------ DIALOGUE ------------------------------ #
@@ -257,23 +264,23 @@ async def to_dialogues(callback: types.CallbackQuery, state: FSMContext):
 # ------------------------------ DIALOGUES FSM ------------------------------ #
 @router.message(Dialogue_1.dialog)
 async def fsm_dialogue_1(message: types.Message, state: FSMContext):
-    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
+    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_2.dialog)
 async def fsm_dialogue_2(message: types.Message, state: FSMContext):
-    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
+    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_3.dialog)
 async def fsm_dialogue_3(message: types.Message, state: FSMContext):
-    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
+    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_4.dialog)
 async def fsm_dialogue_4(message: types.Message, state: FSMContext):
-    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
+    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
 
 @router.message(Dialogue_5.dialog)
 async def fsm_dialogue_5(message: types.Message, state: FSMContext):
-    await message.answer(text="В гастройках бота указан не действительный OpenAI токен")
+    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
 # ------------------------------ DIALOGUES FSM ------------------------------ #
 
 
