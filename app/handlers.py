@@ -18,9 +18,13 @@ from database.query import (
 import app.keyboards as kb
 from app.keyboards import get_dialogues_markup
 from app import answers
+import config
 
 
 router = Router()
+
+class Feedback(StatesGroup):
+    feedback = State()
 
 class SetFirstPromt(StatesGroup):
     promt = State()
@@ -58,16 +62,45 @@ class Dialogue_5(StatesGroup):
 @router.message(CommandStart())
 async def cmd_start(message: types.Message):
     await create_user(
-        id=int(message.from_user.id), 
+        id=int(message.from_user.id),
+        chat_id=int(message.chat.id),
         firstname=str(message.from_user.first_name), 
         lastname=str(message.from_user.last_name)
     )
-    users = await all_users()
-
     await message.answer(text=answers.START_ANSWER, parse_mode='html', reply_markup=kb.main)
 
 
 # CALLBACKS
+# ------------------------------ PAYMENT ------------------------------ #
+@router.message(Command('donate'))
+async def send_invoice_handler(message: types.Message):
+    prices = [types.LabeledPrice(label="XTR", amount=1)]
+    await message.answer_invoice(
+        title="Оплата услуг",
+        description="описание",
+        prices=prices,
+        provider_token="",
+        payload="payload",
+        currency="XTR",
+        reply_markup=kb.payment_keyboard(amount=1)
+    )
+
+@router.pre_checkout_query()
+async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery):
+    await pre_checkout_query.answer(ok=True)
+
+@router.callback_query(F.successful_payment)
+async def success_payment_handler(message: types.Message):
+    await message.answer(text="Все шик")
+
+@router.message(Command('paysupport'))
+async def pay_support_handler(message: types.Message):  
+    await message.answer(  
+        text="Добровольные пожертвования не подразумевают возврат средств, "  
+        "однако, если вы очень хотите вернуть средства - свяжитесь с нами."    )
+# ------------------------------ PAYMENT ------------------------------ #
+
+
 # ------------------------------ MAIN ------------------------------ #
 @router.callback_query(F.data == 'dialogues')
 async def dialogues(callback: types.CallbackQuery):
@@ -97,6 +130,11 @@ async def settings(callback: types.CallbackQuery):
 @router.callback_query(F.data == 'info')
 async def info(callback: types.CallbackQuery):
     await callback.message.edit_text(text=answers.INFO_ANSWER, parse_mode='html', reply_markup=kb.info)
+
+@router.callback_query(F.data == 'feedback')
+async def feedback(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(Feedback.feedback)
+    await callback.message.edit_text(text=answers.FEEDBACK_1, parse_mode='html')
 # ------------------------------ ADDITIONAL ------------------------------ #
 
 
@@ -125,7 +163,7 @@ async def change_name_1(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_1(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_1.change_model)
     markup = await kb.get_models_markup(dialogue_number=1)
-    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
+    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_2')
 async def dialog_2(callback: types.CallbackQuery, state: FSMContext):
@@ -143,7 +181,7 @@ async def change_name_2(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_2(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_2.change_model)
     markup = await kb.get_models_markup(dialogue_number=2)
-    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
+    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_3')
 async def dialog_3(callback: types.CallbackQuery, state: FSMContext):
@@ -161,7 +199,7 @@ async def change_name_3(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_3(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_3.change_model)
     markup = await kb.get_models_markup(dialogue_number=3)
-    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
+    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_4')
 async def dialog_4(callback: types.CallbackQuery, state: FSMContext):
@@ -179,7 +217,7 @@ async def change_name_4(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_4(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_4.change_model)
     markup = await kb.get_models_markup(dialogue_number=4)
-    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
+    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
 
 @router.callback_query(F.data == 'dialog_5')
 async def dialog_5(callback: types.CallbackQuery, state: FSMContext):
@@ -197,7 +235,7 @@ async def change_name_5(callback: types.CallbackQuery, state: FSMContext):
 async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Dialogue_5.change_model)
     markup = await kb.get_models_markup(dialogue_number=5)
-    await callback.message.edit_text(text="⚒ Выберите модель ⚒", reply_markup=markup)
+    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
 
 @router.callback_query(F.data == 'history_1')
 @router.callback_query(F.data == 'history_2')
@@ -213,34 +251,38 @@ async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == 'del_history_4')
 @router.callback_query(F.data == 'del_history_5')
 async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer(text="История сообщений отчищена")
+    await callback.message.answer(text=answers.HISTORY_IS_DELETED)
 # ------------------------------ DIALOGUE ------------------------------ #
 
 
 # ------------------------------ INFO ------------------------------ #
-@router.callback_query(F.data == 'about_model')
+@router.callback_query(F.data == 'about_bot')
 async def about_model(callback: types.CallbackQuery):
-    await callback.answer(text=answers.ABOUT_MODEL)
+    await callback.message.answer(text=answers.ABOUT_BOT)
+
+@router.callback_query(F.data == 'about_stars')
+async def about_token(callback: types.CallbackQuery):
+    await callback.message.answer(text=answers.ABOUT_STARS, parse_mode='html')
+
+@router.callback_query(F.data == 'about_buy_stars')
+async def about_promt(callback: types.CallbackQuery):
+    await callback.message.answer(text=answers.ABOUT_BUY_STARS, parse_mode='html')
+
+@router.callback_query(F.data == 'about_actual_model')
+async def about_referal(callback: types.CallbackQuery):
+    await callback.message.answer(text=answers.ABOUT_ACTUAL_MODEL, parse_mode='html')
+
+@router.callback_query(F.data == 'about_model')
+async def about_bot(callback: types.CallbackQuery):
+    await callback.message.answer(text=answers.ABOUT_MODEL, parse_mode='html')
 
 @router.callback_query(F.data == 'about_token')
-async def about_token(callback: types.CallbackQuery):
-    await callback.answer(text=answers.ABOUT_TOKEN, show_alert=True)
+async def about(callback: types.CallbackQuery):
+    await callback.message.answer(text=answers.ABOUT_TOKEN, parse_mode='html')
 
 @router.callback_query(F.data == 'about_promt')
-async def about_promt(callback: types.CallbackQuery):
-    await callback.answer(text=answers.ABOUT_PROMT, show_alert=True)
-
-@router.callback_query(F.data == 'about_referal')
-async def about_referal(callback: types.CallbackQuery):
-    await callback.answer(text=answers.ABOUT_REFERAL, show_alert=True)
-
-@router.callback_query(F.data == 'about_bot')
-async def about_bot(callback: types.CallbackQuery):
-    await callback.answer(text=answers.ABOUT_BOT, show_alert=True)
-
-@router.callback_query(F.data == 'about')
 async def about(callback: types.CallbackQuery):
-    await callback.answer(text=answers.ABOUT, show_alert=True)
+    await callback.message.answer(text=answers.ABOUT_PROMT, parse_mode='html')
 # ------------------------------ INFO ------------------------------ #
 
 
@@ -285,6 +327,19 @@ async def fsm_dialogue_5(message: types.Message, state: FSMContext):
 
 
 # ------------------------------ OTHER FSM ------------------------------ #
+@router.message(Feedback.feedback)
+async def feedback_fsm(message: types.Message, state: FSMContext):
+    await state.clear()
+    for admin_id in config.ADMIN_CHAT_IDS:
+        try:
+            await message.forward(chat_id=int(admin_id))
+        except Exception as e:
+            print(f"Failed to forward message to admin {admin_id}: {e}")
+
+    await message.answer(text=answers.FEEDBACK_2, parse_mode='html')
+    await message.answer(text=answers.ADDITIONAL_ANSWER, parse_mode='html', reply_markup=kb.additional)
+
+
 @router.callback_query(F.data == 'first_promt')
 async def set_first_promt_s1(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(SetFirstPromt.promt)
@@ -321,67 +376,82 @@ async def set_first_promt_s2(message: types.Message, state: FSMContext):
 
 @router.message(Dialogue_1.change_name)
 async def fsm_set_dialog_1_title(message: types.Message, state: FSMContext):
-    await state.update_data(change_name=message.text)
-    data = await state.get_data()
-    dialogue_title = data.get('change_name', '')
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-    await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=0)
-    await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await state.set_state(Dialogue_1.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
+    if len(str(message.text)) > 40:
+        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
+    else:
+        await state.update_data(change_name=message.text)
+        data = await state.get_data()
+        dialogue_title = data.get('change_name', '')
+        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
+        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=0)
+        await state.clear()
+        await message.answer(text=answers.SETTINGS_APPLIED)
+        await state.set_state(Dialogue_1.dialog)
+        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
 
 
 @router.message(Dialogue_2.change_name)
 async def fsm_set_dialog_2_title(message: types.Message, state: FSMContext):
-    await state.update_data(change_name=message.text)
-    data = await state.get_data()
-    dialogue_title = data.get('change_name', '')
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-    await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=1)
-    await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await state.set_state(Dialogue_2.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
+    if len(str(message.text)) > 40:
+        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
+    else:
+        await state.update_data(change_name=message.text)
+        data = await state.get_data()
+        dialogue_title = data.get('change_name', '')
+        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
+        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=1)
+        await state.clear()
+        await message.answer(text=answers.SETTINGS_APPLIED)
+        await state.set_state(Dialogue_2.dialog)
+        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
 
 
 @router.message(Dialogue_3.change_name)
 async def fsm_set_dialog_3_title(message: types.Message, state: FSMContext):
-    await state.update_data(change_name=message.text)
-    data = await state.get_data()
-    dialogue_title = data.get('change_name', '')
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-    await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=2)
-    await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await state.set_state(Dialogue_3.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
+    if len(str(message.text)) > 40:
+        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
+    else:
+        await state.update_data(change_name=message.text)
+        data = await state.get_data()
+        dialogue_title = data.get('change_name', '')
+        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
+        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=2)
+        await state.clear()
+        await message.answer(text=answers.SETTINGS_APPLIED)
+        await state.set_state(Dialogue_3.dialog)
+        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
 
 
 @router.message(Dialogue_4.change_name)
 async def fsm_set_dialog_4_title(message: types.Message, state: FSMContext):
-    await state.update_data(change_name=message.text)
-    data = await state.get_data()
-    dialogue_title = data.get('change_name', '')
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-    await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=3)
-    await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await state.set_state(Dialogue_4.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
+    if len(str(message.text)) > 40:
+        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
+    else:
+        await state.update_data(change_name=message.text)
+        data = await state.get_data()
+        dialogue_title = data.get('change_name', '')
+        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
+        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=3)
+        await state.clear()
+        await message.answer(text=answers.SETTINGS_APPLIED)
+        await state.set_state(Dialogue_4.dialog)
+        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
 
 
 @router.message(Dialogue_5.change_name)
 async def fsm_set_dialog_5_title(message: types.Message, state: FSMContext):
-    await state.update_data(change_name=message.text)
-    data = await state.get_data()
-    dialogue_title = data.get('change_name', '')
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-    await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=4)
-    await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await state.set_state(Dialogue_5.dialog)
-    await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
+    if len(str(message.text)) > 40:
+        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
+    else:
+        await state.update_data(change_name=message.text)
+        data = await state.get_data()
+        dialogue_title = data.get('change_name', '')
+        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
+        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=4)
+        await state.clear()
+        await message.answer(text=answers.SETTINGS_APPLIED)
+        await state.set_state(Dialogue_5.dialog)
+        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
 
 
 

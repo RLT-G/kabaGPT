@@ -1,8 +1,14 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton 
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 import config
 
 
+def payment_keyboard(amount: int):
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"Оплатить {amount} XTR", pay=True)
+
+    return builder.as_markup()
 
 # ------------------------------ MAIN ------------------------------ #
 main = InlineKeyboardMarkup(
@@ -16,11 +22,11 @@ main = InlineKeyboardMarkup(
 async def get_dialogues_markup(button_texts):
     dialogues = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=f"🟢 {button_texts[0]}", callback_data='dialog_1')],
-            [InlineKeyboardButton(text=f"🔵 {button_texts[1]}", callback_data='dialog_2')],
-            [InlineKeyboardButton(text=f"🟣 {button_texts[2]}", callback_data='dialog_3')],
-            [InlineKeyboardButton(text=f"🟤 {button_texts[3]}", callback_data='dialog_4')],
-            [InlineKeyboardButton(text=f"🟠 {button_texts[4]}", callback_data='dialog_5')],
+            [InlineKeyboardButton(text=f"1. {button_texts[0]}", callback_data='dialog_1')],
+            [InlineKeyboardButton(text=f"2. {button_texts[1]}", callback_data='dialog_2')],
+            [InlineKeyboardButton(text=f"3. {button_texts[2]}", callback_data='dialog_3')],
+            [InlineKeyboardButton(text=f"4. {button_texts[3]}", callback_data='dialog_4')],
+            [InlineKeyboardButton(text=f"5. {button_texts[4]}", callback_data='dialog_5')],
             [InlineKeyboardButton(text='Назад ⬅', callback_data='to_main')],
         ]
     )
@@ -37,7 +43,8 @@ additional = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text='🌎 Реферальная программа 🌍', callback_data='referal')],
         [InlineKeyboardButton(text='⚒ Настройки ⚒', callback_data='settings')],
-        [InlineKeyboardButton(text='🌐 Информация 🌐', callback_data='info')],
+        [InlineKeyboardButton(text='🌐 Справочник 🌐', callback_data='info')],
+        [InlineKeyboardButton(text='📢 Обратная связь 📢', callback_data='feedback')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_main')]
     ]
 )
@@ -62,9 +69,10 @@ settings = InlineKeyboardMarkup(
 
 info = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='📧 Модели', callback_data='about_model'), InlineKeyboardButton(text='Токены 💲', callback_data='about_token')],
-        [InlineKeyboardButton(text='💬 Промты', callback_data='about_promt'), InlineKeyboardButton(text='Реферальная программа 🆓', callback_data='about_referal')],
-        [InlineKeyboardButton(text='🤖 Про бота', callback_data='about_bot'), InlineKeyboardButton(text='Создатели 👤', callback_data='about')],
+        [InlineKeyboardButton(text='Промты', callback_data='about_promt'), InlineKeyboardButton(text='Токены', callback_data='about_token')],
+        [InlineKeyboardButton(text='Используемые ИИ', callback_data='about_model'), InlineKeyboardButton(text='Актуальность ИИ', callback_data='about_actual_model')],
+        [InlineKeyboardButton(text='Пополнение Stars', callback_data='about_buy_stars'), InlineKeyboardButton(text='Telegram Stars', callback_data='about_stars')],
+        [InlineKeyboardButton(text='Выгода от использования бота', callback_data='about_bot')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_additional')]
     ]
 )
@@ -74,7 +82,7 @@ info = InlineKeyboardMarkup(
 # ------------------------------ DIALOGUE ------------------------------ #
 dialogue_1 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_1'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_1')],
+        [InlineKeyboardButton(text='Сменить название', callback_data='change_name_1'), InlineKeyboardButton(text='Сменить ИИ', callback_data='change_model_1')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_1'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_1')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -82,7 +90,7 @@ dialogue_1 = InlineKeyboardMarkup(
 
 dialogue_2 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_2'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_2')],
+        [InlineKeyboardButton(text='Сменить название', callback_data='change_name_2'), InlineKeyboardButton(text='Сменить ИИ', callback_data='change_model_2')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_2'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_2')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -90,7 +98,7 @@ dialogue_2 = InlineKeyboardMarkup(
 
 dialogue_3 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_3'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_3')],
+        [InlineKeyboardButton(text='Сменить название', callback_data='change_name_3'), InlineKeyboardButton(text='Сменить ИИ', callback_data='change_model_3')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_3'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_3')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -98,7 +106,7 @@ dialogue_3 = InlineKeyboardMarkup(
 
 dialogue_4 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_4'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_4')],
+        [InlineKeyboardButton(text='Сменить название', callback_data='change_name_4'), InlineKeyboardButton(text='Сменить ИИ', callback_data='change_model_4')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_4'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_4')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]
@@ -106,7 +114,7 @@ dialogue_4 = InlineKeyboardMarkup(
 
 dialogue_5 = InlineKeyboardMarkup(
     inline_keyboard=[
-        [InlineKeyboardButton(text='Изменить название диалога', callback_data='change_name_5'), InlineKeyboardButton(text='Выбрать модель', callback_data='change_model_5')],
+        [InlineKeyboardButton(text='Сменить название', callback_data='change_name_5'), InlineKeyboardButton(text='Сменить ИИ', callback_data='change_model_5')],
         [InlineKeyboardButton(text='Показать историю', callback_data='history_5'), InlineKeyboardButton(text='Отчистить историю', callback_data='del_history_5')],
         [InlineKeyboardButton(text='Назад ⬅', callback_data='to_dialogues')]
     ]

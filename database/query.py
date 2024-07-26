@@ -8,7 +8,7 @@ from config import (
 )
 
 
-async def create_user(id: int, firstname: str = '', lastname: str = '') -> None:
+async def create_user(id: int, chat_id: int, firstname: str = '', lastname: str = '') -> None:
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.id == id).limit(1))
 

@@ -12,6 +12,8 @@ OPAENAI_TOKEN = os.getenv('OPAENAI_TOKEN')
 
 # openai.api_key = OPAENAI_TOKEN
 
+ADMIN_CHAT_IDS = list(set(os.getenv('ADMIN_CHAT_IDS').split('.')))
+
 DB_PATH = os.getenv('DB_PATH')
 
 DEFAULT_FIRST_PROMT = """
