@@ -20,6 +20,7 @@ class User(Base):
     lastname: Mapped[str] = mapped_column(String(128), unique=False, nullable=True)
     first_promt: Mapped[str] = mapped_column(Text(2048), unique=False)
     second_promt: Mapped[str] = mapped_column(Text(2048), unique=False)
+    referral_users: Mapped[str] = mapped_column(String(2048), nullable=True, default='')
     dialog_titles: Mapped[str] = mapped_column(String(1024), default='Диалог 1&#13Диалог 2&#13Диалог 3&#13Диалог 4&#13Диалог 5')
     dialogue_models: Mapped[str] = mapped_column(String(512), default='gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini')
     

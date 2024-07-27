@@ -10,7 +10,9 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 OPAENAI_TOKEN = os.getenv('OPAENAI_TOKEN')
 
+BOT_BASE_LINK = "https://t.me/Kaba_kaba_bot"
 # openai.api_key = OPAENAI_TOKEN
+# https://fornex.com/ru/ssd-vps/cloud-nvme-1-1-10/
 
 ADMIN_CHAT_IDS = list(set(os.getenv('ADMIN_CHAT_IDS').split('.')))
 

@@ -123,8 +123,9 @@ dialogue_5 = InlineKeyboardMarkup(
 async def get_models_markup(dialogue_number: int):
     marlup = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='gpt-4o-mini', callback_data=f"set gpt-4o-mini to dialogue_{dialogue_number}")],
-            [InlineKeyboardButton(text='gpt-4o', callback_data=f"set gpt-4o to dialogue_{dialogue_number}")],
+            [InlineKeyboardButton(text='GPT-4o mini (для повседневных задач)', callback_data=f"set gpt-4o-mini to dialogue_{dialogue_number}")],
+            [InlineKeyboardButton(text='GPT-4o (для сложных задач)', callback_data=f"set gpt-4o to dialogue_{dialogue_number}")],
+            [InlineKeyboardButton(text='DALL·E 3 (для создания изображений)', callback_data=f"set dalle3 to dialogue_{dialogue_number}")],
         ]
     )
     return marlup
