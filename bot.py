@@ -2,7 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from app.handlers import router
-from database.models import async_main
+from data.database.models import async_main
 import config
 
 

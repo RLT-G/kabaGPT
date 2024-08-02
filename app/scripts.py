@@ -4,11 +4,11 @@ import asyncio
 
 async def count_tokens(prompt: str, instructions: str) -> int:
     """Мерзость для токенизации текста"""
+    # cl100k_base - все остальное
+    # o200k_base - gpt-4o
 
     try:
-        # cl100k_base - все остальное
-        # o200k_base - gpt-4o
-        tokenizer = tiktoken.get_encoding("cl100k_base")  
+        tokenizer = tiktoken.get_encoding("o200k_base")  
 
         prompt_tokens = tokenizer.encode(prompt)
         instructions_tokens = tokenizer.encode(instructions)

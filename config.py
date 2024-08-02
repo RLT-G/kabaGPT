@@ -1,24 +1,53 @@
 from dotenv import load_dotenv
-import openai
 import os
 
 load_dotenv()
 
-DEBUG = False
+DEBUG = os.getenv('DEBUG') == 'True'
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 OPAENAI_TOKEN = os.getenv('OPAENAI_TOKEN')
 
-BOT_BASE_LINK = "https://t.me/Kaba_kaba_bot"
-# openai.api_key = OPAENAI_TOKEN
-# https://fornex.com/ru/ssd-vps/cloud-nvme-1-1-10/
+YOUKASSA_TEST_TOKEN = os.getenv('YOUKASSA_TEST_TOKEN')
 
-ADMIN_CHAT_IDS = list(set(os.getenv('ADMIN_CHAT_IDS').split('.')))
+MAX_OUTPUT_TOKENS = 150
 
-DB_PATH = os.getenv('DB_PATH')
+PRICE_MULTIPLIER = 5
 
-DEFAULT_FIRST_PROMT = """
+OPENAI_MODEL = {
+    'gpt-4o': {
+        'Context window': '128,000 tokens',
+        'Max output tokens': '4,096 tokens',
+        'input': '0.000005',
+        'output': '0.000015'
+    },
+    'gpt-4o-mini': {
+        'Context window': '128,000 tokens',
+        'Max output tokens': '16,384 tokens',
+        'input': f'{0.15 / 1_000_000}',
+        'output': f'{0.6 / 1_000_000}'
+    },
+    'dall-e-3': {
+        'Standard': {
+            '1024×1024': '0.040',
+            '1024×1792': '0.080',
+            '1792×1024': '0.080'
+        },
+        'HD': {
+            '1024×1024': '0.080',
+            '1024×1792': '0.120',
+            '1792×1024': '0.120'
+        }
+    }
+}
+
+ADMIN_CHAT_IDS=[
+    '5243937469',
+]
+
+DEFAULT_VALUES = {
+    'first_promt': """
 Follow in the strict order:
 
 1. USE the language of my message.
@@ -34,9 +63,8 @@ Follow in the strict order:
 I'll answer as the world-famous <specific field> scientists with <most prestigious LOCAL award>
 
 <Deep knowledge step-by-step answer, with CONCRETE details>
-"""
-
-DEFAULT_SECOND_PROMT = """
+""",
+    'second_promt': """
 You MUST follow the instructions for answering:
 
 - ALWAYS answer in the language of my message.
@@ -46,7 +74,4 @@ You MUST follow the instructions for answering:
 - You ALWAYS will be PENALIZED for wrong and low-effort answers. 
 - ALWAYS follow "Answering rules."
 """
-
-DEFAULT_DIALOGUE_TITLES = "Диалог 1&#13Диалог 2&#13Диалог 3&#13Диалог 4&#13Диалог 5" # &#13 - sep
-
-DEFAULT_DIALOGUE_MODELS = "gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini&#13gpt-4o-mini" # &#13 - sep
+}

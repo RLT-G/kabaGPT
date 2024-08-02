@@ -1,310 +1,544 @@
 from aiogram import types, F, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
-from .states import *
+from aiogram.fsm.state import StatesGroup, State
+from app.custom_filter import ContainsCallbackData
+from app.scripts import count_tokens
+from app.api import fetch_chatgpt_response, fetch_dalle_response
+import app.keyboards as kb
+import app.keyboards as kb
 
-from database.query import (
+from data.database.query import (
     create_user,
-    all_users,
-    set_default,
+    increment_referral_count,
+    get_referral_data,
     set_first_promt,
     set_second_promt,
-    get_button_texts,
-    get_dialogue_models,
-    set_dialogue_title,
-    set_model_to_dialogue,
-    add_referral_user,
-    get_referral_count
+    get_promts,
+    set_default_promts,
+    get_dialogue_names,
+    create_new_chat,
+    set_current_dialog_index,
+    get_dialog_data_by_index,
+    set_dialog_name,
+    get_current_dialog_index,
+    set_model,
+    del_current_dialogue,
+    get_data_for_request,
+    get_balance,
+    set_balance,
+    get_referral_balance,
+    get_last_invoice,
+    set_last_invoice
 )
 
-import app.keyboards as kb
-from app.keyboards import get_dialogues_markup
-from app import answers
+from data.outputs import answer_texts
 import config
 
 
 router = Router()
 
 
+class States(StatesGroup):
+    first_promt = State()
+    second_promt = State()
+    feedback = State()
+    chat = State()
+    change_name = State()
+    amount = State()
+    
+
 # COMMANDS
 @router.message(CommandStart())
-async def cmd_start(message: types.Message):
-    await create_user(
-        id=int(message.from_user.id),
-        chat_id=int(message.chat.id),
-        firstname=str(message.from_user.first_name), 
-        lastname=str(message.from_user.last_name)
-    )
-    # https://t.me/Kaba_kaba_bot?start=test
+async def cmd_start(message: types.Message, state: FSMContext):
+    await state.clear()
+    # https://t.me/chatgpt_kaba_bot?start=test
     args = message.text.split()[1:]
     if args:
         referrer_id = int(args[0])
-        await add_referral_user(referral_id=referrer_id, id=int(message.from_user.id))
-            
-    await message.answer(text=answers.START_ANSWER, parse_mode='html', reply_markup=kb.main)
+        await increment_referral_count(id=referrer_id)
 
+    else:
+        referrer_id = 0
 
-# CALLBACKS
-# ------------------------------ PAYMENT ------------------------------ #
-@router.message(Command('donate'))
-async def send_invoice_handler(message: types.Message):
-    prices = [types.LabeledPrice(label="XTR", amount=1)]
-    await message.answer_invoice(
-        title="Оплата услуг",
-        description="описание",
-        prices=prices,
-        provider_token="",
-        payload="payload",
-        currency="XTR",
-        reply_markup=kb.payment_keyboard(amount=1)
+    await create_user(
+        id=int(message.from_user.id),
+        firstname=str(message.from_user.first_name), 
+        lastname=str(message.from_user.last_name),
+        referral_user=referrer_id
     )
+            
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('main'), 
+        parse_mode='html',
+        reply_markup=await kb.main(str(message.from_user.language_code))
+    )
+
+
+@router.message(Command('wallet'))
+async def wallet(message: types.Message, state: FSMContext):
+    await state.clear()
+    balance = await get_balance(id=int(message.from_user.id))
+    referral_balance = await get_referral_balance(id=int(message.from_user.id))
+
+    gpt4o_tokens = float(balance) / (
+        (float(config.OPENAI_MODEL['gpt-4o']['input']) * config.PRICE_MULTIPLIER + \
+              float(config.OPENAI_MODEL['gpt-4o']['output']) * config.PRICE_MULTIPLIER) / 2
+        )
+    
+    gpt4omini_tokens = float(balance) / (
+        (float(config.OPENAI_MODEL['gpt-4o-mini']['input']) * config.PRICE_MULTIPLIER + \
+              float(config.OPENAI_MODEL['gpt-4o-mini']['output']) * config.PRICE_MULTIPLIER) / 2
+        )
+    
+    dalle3_tokens = float(balance) / (float(config.OPENAI_MODEL['dall-e-3']['Standard']['1024×1024']) * config.PRICE_MULTIPLIER)
+
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en')
+            .get('wallet')
+            .format(balance, referral_balance, int(gpt4o_tokens), int(gpt4omini_tokens), int(dalle3_tokens)), 
+        parse_mode='html',
+        reply_markup=await kb.wallet(laungage_code=str(message.from_user.language_code))
+    )
+
+
+@router.message(Command('dialogues'))
+async def func(message: types.Message, state: FSMContext):
+    await state.clear()
+    dialogue_names = await get_dialogue_names(id=int(message.from_user.id))
+
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('dialogue'), 
+        parse_mode='html', 
+        reply_markup=await kb.dialogue(laungage_code=str(message.from_user.language_code), dialogue_names=dialogue_names)
+    )
+
+
+@router.message(Command('info'))
+async def func(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('info'), 
+        parse_mode='html', 
+        reply_markup=await kb.info(str(message.from_user.language_code))
+    )
+
+
+@router.message(Command('feedback'))
+async def func(message: types.Message, state: FSMContext):
+    await state.clear()
+    await state.set_state(States.feedback)
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('feedback_1'), 
+        parse_mode='html', 
+    )
+
+
+@router.message(Command('referral'))
+async def func(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        text=answer_texts.get(
+            str(message.from_user.language_code), 'en')
+                .get('referral')
+                .format(
+                    *await get_referral_data(id=int(message.from_user.id)
+                )
+        ), 
+        parse_mode='html', 
+        reply_markup=await kb.referral(str(message.from_user.language_code))
+    )
+
+
+@router.message(Command('settings'))
+async def func(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('settings'), 
+        parse_mode='html', 
+        reply_markup=await kb.settings(str(message.from_user.language_code))
+    )
+
+
+# ------------------------------ PAYMENT ------------------------------ #
+@router.callback_query(F.data == 'payment_1')
+async def wallet(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(States.amount)
+
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('payment_1'),
+        parse_mode='html',
+    )
+
+    await callback.answer()
+
+
+@router.message(States.amount)
+async def send_invoice_handler(message: types.Message, state: FSMContext):
+
+    amount_text = message.text
+
+    try:
+        amount = int(amount_text) * 100
+        await set_last_invoice(id=int(message.from_user.id), last_invoice=str(amount))
+
+    except ValueError:
+        await message.answer("Введите корректную сумму в рублях.")
+        return
+    
+    await state.update_data(amount=amount)
+
+    await message.answer_invoice(        
+        title="Пополнение баланса.",
+        description="Пополнение кошелька для использования ИИ.\n Конечная сумма будет переведена в USD",
+        payload="Payment",
+        provider_token=config.YOUKASSA_TEST_TOKEN,
+        currency="rub",
+        prices=[
+            types.LabeledPrice(
+                label='Общая сумма',
+                amount=amount
+            )
+        ],
+        max_tip_amount=5000_00,
+        suggested_tip_amounts=[100_00, 1000_00, 2500_00, 5000_00],
+        # provider_data=...
+        # need_name=True,
+        # need_phone_number=True,
+        # need_email=True,
+        # need_shipping_address=True,
+        # send_phone_number_to_provider=True,
+        # send_email_to_provider=True
+        disable_notification=False,
+        protect_content=True
+    )
+    await state.clear()
+
 
 @router.pre_checkout_query()
 async def pre_checkout_handler(pre_checkout_query: types.PreCheckoutQuery):
     await pre_checkout_query.answer(ok=True)
 
-@router.callback_query(F.successful_payment)
-async def success_payment_handler(message: types.Message):
-    await message.answer(text="Все шик")
 
-@router.message(Command('paysupport'))
-async def pay_support_handler(message: types.Message):  
-    await message.answer(  
-        text="Добровольные пожертвования не подразумевают возврат средств, "  
-        "однако, если вы очень хотите вернуть средства - свяжитесь с нами.")
+@router.message(F.successful_payment)
+async def success_payment_handler(message: types.CallbackQuery, state: FSMContext):
+    amount = float(await get_last_invoice(id=int(message.from_user.id))) / 100
+    
+    if amount is None:
+        await message.answer("Ошибка: сумма платежа не найдена.")
+        return
+    
+    payment_amount = float(amount) * 0.011657 
+    await state.clear()
+    
+    user_id = int(message.from_user.id)
+    balance = float(await get_balance(id=user_id))
+    await set_balance(id=user_id, balance=str(balance + payment_amount))
+    
+    await message.answer(text="Оплата прошла успешно")
 # ------------------------------ PAYMENT ------------------------------ #
 
 
-# ------------------------------ MAIN ------------------------------ #
-@router.callback_query(F.data == 'dialogues')
-async def dialogues(callback: types.CallbackQuery):
-    button_texts = await get_button_texts(id=int(callback.from_user.id))
-    murkup = await get_dialogues_markup(button_texts=button_texts)
-    await callback.message.edit_text(text=answers.DIALOGUES_ANSWER, parse_mode='html', reply_markup=murkup)
-
 @router.callback_query(F.data == 'wallet')
 async def wallet(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.WALLET_ANSWER, parse_mode='html', reply_markup=kb.wallet)
+    balance = await get_balance(id=int(callback.from_user.id))
+    referral_balance = await get_referral_balance(id=int(callback.from_user.id))
 
-@router.callback_query(F.data == 'additional')
-async def additional(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.ADDITIONAL_ANSWER, parse_mode='html', reply_markup=kb.additional)
-# ------------------------------ MAIN ------------------------------ #
+    gpt4o_tokens = float(balance) / (
+        (float(config.OPENAI_MODEL['gpt-4o']['input']) * config.PRICE_MULTIPLIER + \
+              float(config.OPENAI_MODEL['gpt-4o']['output']) * config.PRICE_MULTIPLIER) / 2
+        )
+    
+    gpt4omini_tokens = float(balance) / (
+        (float(config.OPENAI_MODEL['gpt-4o-mini']['input']) * config.PRICE_MULTIPLIER + \
+              float(config.OPENAI_MODEL['gpt-4o-mini']['output']) * config.PRICE_MULTIPLIER) / 2
+        )
+    
+    dalle3_tokens = float(balance) / (float(config.OPENAI_MODEL['dall-e-3']['Standard']['1024×1024']) * config.PRICE_MULTIPLIER)
+
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en')
+            .get('wallet')
+            .format(balance, referral_balance, int(gpt4o_tokens), int(gpt4omini_tokens), int(dalle3_tokens)), 
+        parse_mode='html',
+        reply_markup=await kb.wallet(laungage_code=str(callback.from_user.language_code))
+    )
 
 
-# ------------------------------ ADDITIONAL ------------------------------ #
-@router.callback_query(F.data == 'referal')
-async def referal(callback: types.CallbackQuery):
-    referral_href = f"{config.BOT_BASE_LINK}?start={callback.from_user.id}"
-    referal_count = await get_referral_count(id=int(callback.from_user.id))
-    await callback.message.edit_text(text=answers.REFERAL_ANSWER.format(referal_count, referral_href), parse_mode='html', reply_markup=kb.referal)
+@router.callback_query(F.data == 'dialogue')
+@router.callback_query(F.data == 'to_dialogue')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    dialogue_names = await get_dialogue_names(id=int(callback.from_user.id))
 
-@router.callback_query(F.data == 'settings')
-async def settings(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.SETTINGS_ANSWER, parse_mode='html', reply_markup=kb.settings)
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('dialogue'), 
+        parse_mode='html', 
+        reply_markup=await kb.dialogue(laungage_code=str(callback.from_user.language_code), dialogue_names=dialogue_names)
+    )
+
+
+@router.callback_query(F.data == 'create_new_chat')
+async def func(callback: types.CallbackQuery):
+    chat_name, chat_model = await create_new_chat(id=int(callback.from_user.id))
+
+    await callback.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en')
+            .get('create_new_chat')
+            .format(chat_name, chat_model),
+        show_alert=True
+    )
+    dialogue_names = await get_dialogue_names(id=int(callback.from_user.id))
+
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('dialogue'), 
+        parse_mode='html', 
+        reply_markup=await kb.dialogue(laungage_code=str(callback.from_user.language_code), dialogue_names=dialogue_names)
+    )
+    
+
+@router.callback_query(F.data == 'change_name')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(States.change_name)
+
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('change_name_1'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
+
+
+@router.message(States.change_name)
+async def func(message: types.Message, state: FSMContext):
+    if len(str(message.text)) <= 40:
+        await set_dialog_name(
+            id=int(message.from_user.id), 
+            dialog_name=str(message.text),
+        )
+        await message.answer(
+            text=answer_texts.get(str(message.from_user.language_code), 'en').get('change_name_2'), 
+            parse_mode='html', 
+        )
+        await state.set_state(States.chat)
+    else: 
+        await message.answer(
+            text=answer_texts.get(str(message.from_user.language_code), 'en').get('change_name_1'), 
+            parse_mode='html', 
+        )
+
+
+@router.callback_query(F.data == 'change_model')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('change_model'), 
+        parse_mode='html', 
+        reply_markup=await kb.change_model(laungage_code=str(callback.from_user.language_code))
+    )
+
+
+@router.callback_query(F.data == 'show_history')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+
+    await callback.message.answer(
+        text="Просмотр истории сообщений пока не доступен 😢", 
+        parse_mode='html', 
+    )
+
+
+@router.callback_query(F.data == 'payment_2')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+
+    await callback.message.answer(
+        text="Оплата через криптовалюту пока не доступна 😢", 
+        parse_mode='html', 
+    )
+
+
+@router.callback_query(F.data == 'set_gpt-4o')
+@router.callback_query(F.data == 'set_gpt-4o-mini')
+@router.callback_query(F.data == 'set_dall-e-3')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    if 'gpt-4o-mini' in str(callback.data):
+        await set_model(id=int(callback.from_user.id), model='gpt-4o-mini')
+
+    elif 'gpt-4o' in str(callback.data):
+        await set_model(id=int(callback.from_user.id), model='gpt-4o')
+
+    elif 'dall-e-3' in str(callback.data):
+        await set_model(id=int(callback.from_user.id), model='dall-e-3')
+
+    current_dialog_index = await get_current_dialog_index(id=int(callback.from_user.id))
+
+    dialogue_model, dialog_title = await get_dialog_data_by_index(
+        id=int(callback.from_user.id), 
+        dialog_index=current_dialog_index
+    )
+
+    await state.set_state(States.chat)
+
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en')
+            .get('inner_dialogue')
+            .format(dialogue_model, dialog_title), 
+        parse_mode='html', 
+        reply_markup= await kb.inner_dialogue(laungage_code=str(callback.from_user.language_code))
+    )
+
+
+@router.callback_query(F.data == 'to_current_d')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    current_dialog_index = await get_current_dialog_index(id=int(callback.from_user.id))
+
+    dialogue_model, dialog_title = await get_dialog_data_by_index(
+        id=int(callback.from_user.id), 
+        dialog_index=current_dialog_index
+    )
+
+    await state.set_state(States.chat)
+
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en')
+            .get('inner_dialogue')
+            .format(dialogue_model, dialog_title), 
+        parse_mode='html', 
+        reply_markup= await kb.inner_dialogue(laungage_code=str(callback.from_user.language_code))
+    )
+
+
+@router.callback_query(F.data == 'del_d')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await del_current_dialogue(id=int(callback.from_user.id))
+
+    dialogue_names = await get_dialogue_names(id=int(callback.from_user.id))
+
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('dialogue'), 
+        parse_mode='html', 
+        reply_markup=await kb.dialogue(laungage_code=str(callback.from_user.language_code), dialogue_names=dialogue_names)
+    )
+
+
+# @router.callback_query('d_' in F.data)
+@router.callback_query(ContainsCallbackData(substring='d_'))
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(States.chat)
+
+    await set_current_dialog_index(
+        id=int(callback.from_user.id), 
+        current_dialog_index=int(str(callback.data)[-1])
+    )
+    dialogue_model, dialog_title = await get_dialog_data_by_index(
+        id=int(callback.from_user.id), 
+        dialog_index=int(str(callback.data)[-1])
+    )
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en')
+            .get('inner_dialogue')
+            .format(dialogue_model, dialog_title), 
+        parse_mode='html', 
+        reply_markup= await kb.inner_dialogue(laungage_code=str(callback.from_user.language_code))
+    )
+
+
+@router.message(States.chat)
+async def func(message: types.Message, state: FSMContext):
+    first_promt, second_promt, dialogue_model = await get_data_for_request(id=int(message.from_user.id))
+
+    c_tokens = await count_tokens(
+        prompt=str(message.text),
+        instructions=first_promt + second_promt,
+    )
+
+    if dialogue_model == 'gpt-4o-mini':
+        total_price = float(config.OPENAI_MODEL['gpt-4o-mini']['input']) * c_tokens * config.PRICE_MULTIPLIER + \
+            float(config.OPENAI_MODEL['gpt-4o-mini']['output']) * config.MAX_OUTPUT_TOKENS * config.PRICE_MULTIPLIER
+        
+    elif dialogue_model == 'gpt-4o':
+        total_price = float(config.OPENAI_MODEL['gpt-4o']['input']) * c_tokens * config.PRICE_MULTIPLIER + \
+            float(config.OPENAI_MODEL['gpt-4o']['output']) * config.MAX_OUTPUT_TOKENS * config.PRICE_MULTIPLIER
+        
+    elif dialogue_model == 'dall-e-3':
+        total_price = float(config.OPENAI_MODEL['dall-e-3']['Standard']['1024×1024']) * config.PRICE_MULTIPLIER
+
+    balance = float(await get_balance(id=int(message.from_user.id)))
+
+    if total_price > balance:
+        await message.answer(
+            text=answer_texts.get(str(message.from_user.language_code), 'en').get('not_enough_money'), 
+            parse_mode='html', 
+        )
+    else:
+        try:
+            sent_message = await message.answer(
+                text="Обработка запроса...", 
+                parse_mode='html', 
+            )
+
+            if dialogue_model == 'dall-e-3':
+                link = await fetch_dalle_response(prompt=str(message.text))
+                await sent_message.delete()
+                # await message.answer(
+                #     text=f"Входноых токенов токенов: {c_tokens}\n{link}", 
+                #     parse_mode='html', 
+                # )
+                await message.answer_photo(photo=link)
+            else:
+
+                response = await fetch_chatgpt_response(
+                    model=str(dialogue_model),
+                    prompt=str(message.text),
+                    instructions=first_promt + second_promt
+                )
+
+                # response = f'price: {total_price} balance: {balance}\nОтввет от GPT авно выяснено, что при оценке дизайна и композиции читаемый текст мешает сосредоточиться. Lorem Ipsum используют потому, что тот обеспечивает более или менее стандартное заполнение шаблона, а также реальное распределение букв и пробелов в абзацах, которое не получается при простой дубликации "Здесь ваш текст.. Здесь ваш текст.. Здесь ваш текст.." Многие программы электронной вёрстки и редакторы HTML используют Lorem Ipsum в качестве текста по умолчанию, так что поиск по ключевым словам "lorem ipsum" сразу показывает, как много веб-страниц всё ещё дожидаются своего настоящего рождения. За прошедшие годы текст Lorem Ipsum получил много версий. Некоторые версии появились по ошибке, некоторые - намеренно (например, юмористические варианты).'
+
+                await sent_message.delete()
+                await message.answer(
+                    text=f"Входноых токенов токенов: {c_tokens}\n{response}", 
+                    parse_mode='html', 
+                )
+                await set_balance(id=int(message.from_user.id), balance=str(balance - total_price))
+
+        except Exception as ex:
+            print(f'Ошибка в обработке запроса к OpenAI, {ex}')
+
+
+@router.callback_query(F.data == 'more')
+@router.callback_query(F.data == 'to_more')
+async def func(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('more'), 
+        parse_mode='html', 
+        reply_markup=await kb.more(str(callback.from_user.language_code))
+    )
+
 
 @router.callback_query(F.data == 'info')
-async def info(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.INFO_ANSWER, parse_mode='html', reply_markup=kb.info)
+async def func(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('info'), 
+        parse_mode='html', 
+        reply_markup=await kb.info(str(callback.from_user.language_code))
+    )
+
 
 @router.callback_query(F.data == 'feedback')
-async def feedback(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Feedback.feedback)
-    await callback.message.edit_text(text=answers.FEEDBACK_1, parse_mode='html')
-# ------------------------------ ADDITIONAL ------------------------------ #
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(States.feedback)
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('feedback_1'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
 
 
-# ------------------------------ SETTINGS ------------------------------ #
-@router.callback_query(F.data == 'set_default_settings')
-async def set_default_settings(callback: types.CallbackQuery):
-    await set_default(id=int(callback.from_user.id))
-    await callback.answer(text='Установлены настройки по умолчанию.', show_alert=True)
-# ------------------------------ SETTINGS ------------------------------ #
-
-
-# ------------------------------ DIALOGUE ------------------------------ #
-@router.callback_query(F.data == 'dialog_1')
-async def dialog_1(callback: types.CallbackQuery, state: FSMContext):
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_1.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
-
-@router.callback_query(F.data == 'change_name_1')
-async def change_name_1(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_1.change_name)
-    await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-
-@router.callback_query(F.data == 'change_model_1')
-async def change_model_1(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_1.change_model)
-    markup = await kb.get_models_markup(dialogue_number=1)
-    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
-
-@router.callback_query(F.data == 'dialog_2')
-async def dialog_2(callback: types.CallbackQuery, state: FSMContext):
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_2.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
-
-@router.callback_query(F.data == 'change_name_2')
-async def change_name_2(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_2.change_name)
-    await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-
-@router.callback_query(F.data == 'change_model_2')
-async def change_model_2(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_2.change_model)
-    markup = await kb.get_models_markup(dialogue_number=2)
-    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
-
-@router.callback_query(F.data == 'dialog_3')
-async def dialog_3(callback: types.CallbackQuery, state: FSMContext):
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_3.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
-
-@router.callback_query(F.data == 'change_name_3')
-async def change_name_3(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_3.change_name)
-    await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-
-@router.callback_query(F.data == 'change_model_3')
-async def change_model_3(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_3.change_model)
-    markup = await kb.get_models_markup(dialogue_number=3)
-    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
-
-@router.callback_query(F.data == 'dialog_4')
-async def dialog_4(callback: types.CallbackQuery, state: FSMContext):
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_4.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
-
-@router.callback_query(F.data == 'change_name_4')
-async def change_name_4(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_4.change_name)
-    await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-
-@router.callback_query(F.data == 'change_model_4')
-async def change_model_4(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_4.change_model)
-    markup = await kb.get_models_markup(dialogue_number=4)
-    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
-
-@router.callback_query(F.data == 'dialog_5')
-async def dialog_5(callback: types.CallbackQuery, state: FSMContext):
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_5.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
-
-@router.callback_query(F.data == 'change_name_5')
-async def change_name_5(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_5.change_name)
-    await callback.message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-
-@router.callback_query(F.data == 'change_model_5')
-async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(Dialogue_5.change_model)
-    markup = await kb.get_models_markup(dialogue_number=5)
-    await callback.message.edit_text(text=answers.CHOUSE_MODEL, reply_markup=markup)
-
-@router.callback_query(F.data == 'history_1')
-@router.callback_query(F.data == 'history_2')
-@router.callback_query(F.data == 'history_3')
-@router.callback_query(F.data == 'history_4')
-@router.callback_query(F.data == 'history_5')
-async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer(text="История сообщений пуста")
-
-@router.callback_query(F.data == 'del_history_1')
-@router.callback_query(F.data == 'del_history_2')
-@router.callback_query(F.data == 'del_history_3')
-@router.callback_query(F.data == 'del_history_4')
-@router.callback_query(F.data == 'del_history_5')
-async def change_model_5(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer(text=answers.HISTORY_IS_DELETED)
-# ------------------------------ DIALOGUE ------------------------------ #
-
-
-# ------------------------------ INFO ------------------------------ #
-@router.callback_query(F.data == 'about_bot')
-async def about_model(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_BOT)
-
-@router.callback_query(F.data == 'about_stars')
-async def about_token(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_STARS, parse_mode='html')
-
-@router.callback_query(F.data == 'about_buy_stars')
-async def about_promt(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_BUY_STARS, parse_mode='html')
-
-@router.callback_query(F.data == 'about_actual_model')
-async def about_referal(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_ACTUAL_MODEL, parse_mode='html')
-
-@router.callback_query(F.data == 'about_model')
-async def about_bot(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_MODEL, parse_mode='html')
-
-@router.callback_query(F.data == 'about_token')
-async def about(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_TOKEN, parse_mode='html')
-
-@router.callback_query(F.data == 'about_promt')
-async def about(callback: types.CallbackQuery):
-    await callback.message.answer(text=answers.ABOUT_PROMT, parse_mode='html')
-# ------------------------------ INFO ------------------------------ #
-
-
-# RETURN CALLBACKS
-@router.callback_query(F.data == 'to_main')
-async def to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.START_ANSWER, parse_mode='html', reply_markup=kb.main)
-
-@router.callback_query(F.data == 'to_additional')
-async def to_additional(callback: types.CallbackQuery):
-    await callback.message.edit_text(text=answers.ADDITIONAL_ANSWER, parse_mode='html', reply_markup=kb.additional)
-    
-@router.callback_query(F.data == 'to_dialogues')
-async def to_dialogues(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    button_texts = await get_button_texts(id=int(callback.from_user.id))
-    murkup = await get_dialogues_markup(button_texts=button_texts)
-    await callback.message.edit_text(text=answers.DIALOGUES_ANSWER, parse_mode='html', reply_markup=murkup)
-
-
-# ------------------------------ DIALOGUES FSM ------------------------------ #
-@router.message(Dialogue_1.dialog)
-async def fsm_dialogue_1(message: types.Message, state: FSMContext):
-    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
-
-@router.message(Dialogue_2.dialog)
-async def fsm_dialogue_2(message: types.Message, state: FSMContext):
-    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
-
-@router.message(Dialogue_3.dialog)
-async def fsm_dialogue_3(message: types.Message, state: FSMContext):
-    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
-
-@router.message(Dialogue_4.dialog)
-async def fsm_dialogue_4(message: types.Message, state: FSMContext):
-    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
-
-@router.message(Dialogue_5.dialog)
-async def fsm_dialogue_5(message: types.Message, state: FSMContext):
-    await message.answer(text="В настройках бота указан не действительный OpenAI токен")
-# ------------------------------ DIALOGUES FSM ------------------------------ #
-
-
-# ------------------------------ OTHER FSM ------------------------------ #
-@router.message(Feedback.feedback)
-async def feedback_fsm(message: types.Message, state: FSMContext):
+@router.message(States.feedback)
+async def func(message: types.Message, state: FSMContext):
     await state.clear()
     for admin_id in config.ADMIN_CHAT_IDS:
         try:
@@ -312,264 +546,149 @@ async def feedback_fsm(message: types.Message, state: FSMContext):
         except Exception as e:
             print(f"Failed to forward message to admin {admin_id}: {e}")
 
-    await message.answer(text=answers.FEEDBACK_2, parse_mode='html')
-    await message.answer(text=answers.ADDITIONAL_ANSWER, parse_mode='html', reply_markup=kb.additional)
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('feedback_2'), 
+        parse_mode='html', 
+    )
+
+
+@router.callback_query(F.data == 'token')
+async def func(callback: types.CallbackQuery):
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('token'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'settings_ai')
+async def func(callback: types.CallbackQuery):
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('settings_ai'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'usage_ai')
+async def func(callback: types.CallbackQuery):
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('usage_ai'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'actual_ai')
+async def func(callback: types.CallbackQuery):
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('actual_ai'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'bot_benefit')
+async def func(callback: types.CallbackQuery):
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('bot_benefit'), 
+        parse_mode='html', 
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == 'referral')
+async def func(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text=answer_texts.get(
+            str(callback.from_user.language_code), 'en')
+                .get('referral')
+                .format(
+                    *await get_referral_data(id=int(callback.from_user.id)
+                )
+        ), 
+        parse_mode='html', 
+        reply_markup=await kb.referral(str(callback.from_user.language_code))
+    )
+
+
+@router.callback_query(F.data == 'settings')
+async def func(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('settings'), 
+        parse_mode='html', 
+        reply_markup=await kb.settings(str(callback.from_user.language_code))
+    )
+
+
+@router.callback_query(F.data == 'to_main')
+async def func(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('main'), 
+        parse_mode='html',
+        reply_markup=await kb.main(str(callback.from_user.language_code))
+    )
 
 
 @router.callback_query(F.data == 'first_promt')
-async def set_first_promt_s1(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(SetFirstPromt.promt)
-    await callback.message.edit_text(text=answers.FIRST_PROMT_TEXT, parse_mode='html')
-
-
-@router.message(SetFirstPromt.promt)
-async def set_first_promt_s2(message: types.Message, state: FSMContext):
-    await state.update_data(promt=message.text)
-    data = await state.get_data()
-    promt = data.get('promt', '')
-    await set_first_promt(id=int(message.from_user.id), first_promt=str(promt))
-    await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await message.answer(text=answers.SETTINGS_ANSWER, parse_mode='html', reply_markup=kb.settings)
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(States.first_promt)
     
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('first_promt'), 
+        parse_mode='html',
+    )
+    await callback.answer()
+
+
+@router.message(States.first_promt)
+async def func(message: types.Message, state: FSMContext):
+    await set_first_promt(id=int(message.from_user.id), first_promt=str(message.text))
+    await state.clear()
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('first_promt_ok'), 
+        parse_mode='html',
+    )
+
 
 @router.callback_query(F.data == 'second_promt')
-async def set_first_promt_s1(callback: types.CallbackQuery, state: FSMContext):
-    await state.set_state(SetSecondPromt.promt)
-    await callback.message.edit_text(text=answers.SECOND_PROMT_TEXT, parse_mode='html')
+async def func(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(States.second_promt)
+    
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('second_promt'), 
+        parse_mode='html',
+    )
+    await callback.answer()
 
 
-@router.message(SetSecondPromt.promt)
-async def set_first_promt_s2(message: types.Message, state: FSMContext):
-    await state.update_data(promt=message.text)
-    data = await state.get_data()
-    promt = data.get('promt', '')
-    await set_second_promt(id=int(message.from_user.id), second_promt=str(promt))
+@router.message(States.second_promt)
+async def func(message: types.Message, state: FSMContext):
+    await set_second_promt(id=int(message.from_user.id), second_promt=str(message.text))
     await state.clear()
-    await message.answer(text=answers.SETTINGS_APPLIED)
-    await message.answer(text=answers.SETTINGS_ANSWER, parse_mode='html', reply_markup=kb.settings)
+    await message.answer(
+        text=answer_texts.get(str(message.from_user.language_code), 'en').get('second_promt_ok'), 
+        parse_mode='html',
+    )
 
 
-@router.message(Dialogue_1.change_name)
-async def fsm_set_dialog_1_title(message: types.Message, state: FSMContext):
-    if len(str(message.text)) > 40:
-        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-    else:
-        await state.update_data(change_name=message.text)
-        data = await state.get_data()
-        dialogue_title = data.get('change_name', '')
-        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=0)
-        await state.clear()
-        await message.answer(text=answers.SETTINGS_APPLIED)
-        await state.set_state(Dialogue_1.dialog)
-        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
+@router.callback_query(F.data == 'see_promts')
+async def func(callback: types.CallbackQuery):
+    
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en')
+            .get('see_promts')
+            .format(*await get_promts(id=int(callback.from_user.id))
+        )
+    )
+    await callback.answer()
 
 
-@router.message(Dialogue_2.change_name)
-async def fsm_set_dialog_2_title(message: types.Message, state: FSMContext):
-    if len(str(message.text)) > 40:
-        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-    else:
-        await state.update_data(change_name=message.text)
-        data = await state.get_data()
-        dialogue_title = data.get('change_name', '')
-        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=1)
-        await state.clear()
-        await message.answer(text=answers.SETTINGS_APPLIED)
-        await state.set_state(Dialogue_2.dialog)
-        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
-
-
-@router.message(Dialogue_3.change_name)
-async def fsm_set_dialog_3_title(message: types.Message, state: FSMContext):
-    if len(str(message.text)) > 40:
-        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-    else:
-        await state.update_data(change_name=message.text)
-        data = await state.get_data()
-        dialogue_title = data.get('change_name', '')
-        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=2)
-        await state.clear()
-        await message.answer(text=answers.SETTINGS_APPLIED)
-        await state.set_state(Dialogue_3.dialog)
-        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
-
-
-@router.message(Dialogue_4.change_name)
-async def fsm_set_dialog_4_title(message: types.Message, state: FSMContext):
-    if len(str(message.text)) > 40:
-        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-    else:
-        await state.update_data(change_name=message.text)
-        data = await state.get_data()
-        dialogue_title = data.get('change_name', '')
-        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=3)
-        await state.clear()
-        await message.answer(text=answers.SETTINGS_APPLIED)
-        await state.set_state(Dialogue_4.dialog)
-        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
-
-
-@router.message(Dialogue_5.change_name)
-async def fsm_set_dialog_5_title(message: types.Message, state: FSMContext):
-    if len(str(message.text)) > 40:
-        await message.answer(text=answers.SET_DIALOGUE_TITLE_TEXT, parse_mode='html')
-    else:
-        await state.update_data(change_name=message.text)
-        data = await state.get_data()
-        dialogue_title = data.get('change_name', '')
-        dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(message.from_user.id), model_index=0), '')
-        await set_dialogue_title(id=int(message.from_user.id), dialogue_title=dialogue_title, dialogue_index=4)
-        await state.clear()
-        await message.answer(text=answers.SETTINGS_APPLIED)
-        await state.set_state(Dialogue_5.dialog)
-        await message.answer(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
-
-
-
-# SET MODELS
-@router.callback_query(F.data == 'set gpt-4o to dialogue_1')
-async def set_gpt_4o_to_dialogue_1(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=0, model='gpt-4o')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_1.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
-
-@router.callback_query(F.data == 'set dalle3 to dialogue_1')
-async def set_dalle3_to_dialogue_1(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=0, model='dalle3')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_1.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
-
-@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_1')
-async def set_gpt_4o_mini_to_dialogue_1(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=0, model='gpt-4o-mini')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=0)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=0), '')
-    await state.set_state(Dialogue_1.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_1)
-
-
-@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_2')
-async def set_gpt_4o_mini_to_dialogue_2(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=1, model='gpt-4o-mini')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=1), '')
-    await state.set_state(Dialogue_2.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
-
-@router.callback_query(F.data == 'set dalle3 to dialogue_2')
-async def set_dalle3_to_dialogue_2(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=1, model='dalle3')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=1), '')
-    await state.set_state(Dialogue_2.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
-
-@router.callback_query(F.data == 'set gpt-4o to dialogue_2')
-async def set_gpt_4o_to_dialogue_2(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=1, model='gpt-4o')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=1)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=1), '')
-    await state.set_state(Dialogue_2.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_2)
-
-
-@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_3')
-async def set_gpt_4o_mini_to_dialogue_3(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=2, model='gpt-4o-mini')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=2), '')
-    await state.set_state(Dialogue_3.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
-
-
-@router.callback_query(F.data == 'set dalle3 to dialogue_3')
-async def set_dalle3_to_dialogue_3(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=2, model='dalle3')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=2), '')
-    await state.set_state(Dialogue_3.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
-
-
-@router.callback_query(F.data == 'set gpt-4o to dialogue_3')
-async def set_gpt_4o_to_dialogue_3(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=2, model='gpt-4o')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=2)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=2), '')
-    await state.set_state(Dialogue_3.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_3)
-
-
-@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_4')
-async def set_gpt_4o_mini_to_dialogue_4(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=3, model='gpt-4o-mini')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=3), '')
-    await state.set_state(Dialogue_4.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
-
-@router.callback_query(F.data == 'set dalle3 to dialogue_4')
-async def set_dalle3_to_dialogue_4(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=3, model='dalle3')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=3), '')
-    await state.set_state(Dialogue_4.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
-
-@router.callback_query(F.data == 'set gpt-4o to dialogue_4')
-async def set_gpt_4o_to_dialogue_4(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=3, model='gpt-4o')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=3)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=3), '')
-    await state.set_state(Dialogue_4.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_4)
-
-
-@router.callback_query(F.data == 'set gpt-4o-mini to dialogue_5')
-async def set_gpt_4o_mini_to_dialogue_5(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=4, model='gpt-4o-mini')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=4), '')
-    await state.set_state(Dialogue_5.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
-
-@router.callback_query(F.data == 'set dalle3 to dialogue_5')
-async def set_dalle3_to_dialogue_5(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=4, model='dalle3')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=4), '')
-    await state.set_state(Dialogue_5.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
-
-@router.callback_query(F.data == 'set gpt-4o to dialogue_5')
-async def set_gpt_4o_to_dialogue_5(callback: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await set_model_to_dialogue(id=int(callback.from_user.id), dialogue_index=4, model='gpt-4o')
-    dialogue_title = await get_button_texts(id=int(callback.from_user.id), dialogue_index=4)
-    dialogue_model = answers.PRETTY_MODEL_NAMES.get(await get_dialogue_models(id=int(callback.from_user.id), model_index=4), '')
-    await state.set_state(Dialogue_5.dialog)
-    await callback.message.edit_text(text=answers.CURENT_DIALOGUES_ANSWER.format(dialogue_title, dialogue_model), parse_mode='html', reply_markup=kb.dialogue_5)
-# ------------------------------ OTHER FSM ------------------------------ #
+@router.callback_query(F.data == 'set_default_promt')
+async def func(callback: types.CallbackQuery):
+    await set_default_promts(id=int(callback.from_user.id))
+    await callback.message.answer(
+        text=answer_texts.get(str(callback.from_user.language_code), 'en').get('set_default_promt'),
+        parse_mode='html',
+    )
+    await callback.answer()
