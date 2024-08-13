@@ -1,9 +1,12 @@
 from dotenv import load_dotenv
 import os
+import pytz
 
 load_dotenv()
 
 DEBUG = os.getenv('DEBUG') == 'True'
+
+TIME_ZONE = pytz.timezone('Europe/Moscow')
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 
@@ -11,9 +14,17 @@ OPAENAI_TOKEN = os.getenv('OPAENAI_TOKEN')
 
 YOUKASSA_TEST_TOKEN = os.getenv('YOUKASSA_TEST_TOKEN')
 
-MAX_OUTPUT_TOKENS = 150
+YOUKASSA_TOKEN = os.getenv('YOUKASSA_TOKEN')
+
+CRYPTOCLOUD_TOKEN = os.getenv('CRYPTOCLOUD_TOKEN')
+
+CRYPTOCLOUD_SHOP_ID = os.getenv('CRYPTOCLOUD_SHOP_ID')
+
+MAX_OUTPUT_TOKENS = 2048
 
 PRICE_MULTIPLIER = 5
+
+DEFAULT_LAUNGAGE = 'ru'
 
 OPENAI_MODEL = {
     'gpt-4o': {
@@ -47,8 +58,7 @@ ADMIN_CHAT_IDS=[
 ]
 
 DEFAULT_VALUES = {
-    'first_promt': """
-Follow in the strict order:
+    'first_promt': """Follow in the strict order:
 
 1. USE the language of my message.
 2. **ONCE PER CHAT** assign a real-world expert role to yourself before answering, e.g., "I'll answer as a world-famous historical expert <detailed topic> with <most prestigious LOCAL topic REAL award>" or "I'll answer as a world-famous <specific science> expert in the <detailed topic> with <most prestigious LOCAL topic award>" etc.
@@ -62,10 +72,8 @@ Follow in the strict order:
 
 I'll answer as the world-famous <specific field> scientists with <most prestigious LOCAL award>
 
-<Deep knowledge step-by-step answer, with CONCRETE details>
-""",
-    'second_promt': """
-You MUST follow the instructions for answering:
+<Deep knowledge step-by-step answer, with CONCRETE details>""",
+    'second_promt': """You MUST follow the instructions for answering:
 
 - ALWAYS answer in the language of my message.
 - Read the entire convo history line by line before answering.

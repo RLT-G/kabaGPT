@@ -2,6 +2,8 @@ from data.database.models import async_session
 from data.database.models import User
 from sqlalchemy import select, update, delete
 from config import DEFAULT_VALUES
+from app.scripts import delete_and_renumber
+import json
 
 
 async def create_user(id: int, firstname: str, lastname: str, referral_user: str) -> None:
@@ -33,8 +35,12 @@ async def get_dialogue_names(id: int):
 
         if user:
             dialog_titles = str(user.dialog_titles).split(', ')[0:-1]
-
-            return dialog_titles
+            dialogue_models = str(user.dialogue_models).split(', ')[0:-1]
+            titles = [
+                f"{dialog_titles[i]} · {dialogue_models[i]}" for i in range(len(dialog_titles))
+            ]
+            
+            return titles
         
 
 async def get_balance(id: int):
@@ -100,9 +106,9 @@ async def create_new_chat(id: int) -> tuple[str]:
         
         if user:
             dialog_titles = str(user.dialog_titles)
-            dialog_titles += f"{int(len(dialog_titles.split(', ')[0:-1])) + 1}. ChatGPT-4o-mini, "
+            dialog_titles += f"Диалог {int(len(dialog_titles.split(', ')[0:-1])) + 1}, "
             dialogue_models = str(user.dialogue_models) + 'gpt-4o-mini, '
-
+            new_dialog_index = len(dialog_titles.split(', ')[0:-1]) - 1
 
             await session.execute(update(User).where(User.id == id).values(
                 dialog_titles=dialog_titles,
@@ -110,7 +116,56 @@ async def create_new_chat(id: int) -> tuple[str]:
             ))
             await session.commit()
 
-            return dialogue_models.split(', ')[-2], dialog_titles.split(', ')[-2]
+            return dialogue_models.split(', ')[-2], dialog_titles.split(', ')[-2], new_dialog_index
+
+
+async def add_message_to_history(id: int, new_message: str, sender: str):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+        
+        if user:
+            history = json.loads(user.message_history or "{}")
+            current_dialog_index = str(user.current_dialog_index)
+
+            if str(current_dialog_index) not in history:
+                history[str(current_dialog_index)] = []
+
+            history[str(current_dialog_index)].append({
+                "sender": sender,
+                "message": new_message
+            })
+            if len(history[str(current_dialog_index)]) > 10:
+                history[str(current_dialog_index)] = history[str(current_dialog_index)][2:]
+            
+            history = json.dumps(history, ensure_ascii=False)
+
+            await session.execute(update(User).where(User.id == id).values(
+                message_history=history
+            ))
+            await session.commit()
+
+
+async def get_dialogue_history(id: int):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+        
+        if user:
+            message_history = json.loads(user.message_history or "{}")
+            current_dialog_index = str(user.current_dialog_index)
+
+            if str(current_dialog_index) not in message_history:
+                return None
+
+            message_history = message_history[str(current_dialog_index)]
+            history = ''
+            for message in message_history:
+                history += f"- {message.get('sender')}\n➖➖➖➖➖➖➖➖➖➖➖\n{message.get('message')}\n\n\n"
+
+            if len(history) > 4000:
+                return history[len(history) - 4000::]
+            return history
 
 
 async def increment_referral_count(id: int) -> None:
@@ -123,6 +178,20 @@ async def increment_referral_count(id: int) -> None:
 
             await session.execute(update(User).where(User.id == id).values(
                 referral_count=referral_count
+            ))
+            await session.commit()
+
+
+async def decrement_free_requests(id: int) -> None:
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+        
+        if user:
+            free_requests = int(user.free_requests) - 1
+
+            await session.execute(update(User).where(User.id == id).values(
+                free_requests=free_requests
             ))
             await session.commit()
 
@@ -159,11 +228,12 @@ async def get_data_for_request(id: int):
 
         if user:
             current_dialog_index = int(user.current_dialog_index)
+            free_requests = int(user.free_requests)
             first_promt = str(user.first_promt)
             second_promt = str(user.second_promt)
             dialogue_model = str(user.dialogue_models).split(', ')[0:-1][current_dialog_index]
 
-            return first_promt, second_promt, dialogue_model
+            return first_promt, second_promt, dialogue_model, free_requests
         
 
 async def get_current_dialog_index(id: int):
@@ -215,16 +285,25 @@ async def del_current_dialogue(id: int) -> None:
             current_dialog_index = int(user.current_dialog_index)
             dialogue_models = str(user.dialogue_models).split(', ')[0:-1]
             dialog_titles = str(user.dialog_titles).split(', ')[0:-1]
+            history = json.loads(user.message_history or "{}")
 
             del dialogue_models[current_dialog_index]
             del dialog_titles[current_dialog_index]
+            history = await delete_and_renumber(dialogues=history, n=current_dialog_index)
+            history = json.dumps(history, ensure_ascii=False)
 
-            dialogue_models = ', '.join(dialogue_models) + ', '
-            dialog_titles = ', '.join(dialog_titles) + ', '
+            if dialogue_models == [] and dialog_titles == []:
+                dialogue_models = ''
+                dialog_titles = ''
+
+            else:
+                dialogue_models = ', '.join(dialogue_models) + ', '
+                dialog_titles = ', '.join(dialog_titles) + ', '
 
             await session.execute(update(User).where(User.id == id).values(
                 dialogue_models=dialogue_models,
-                dialog_titles=dialog_titles
+                dialog_titles=dialog_titles,
+                message_history=history
             ))
             await session.commit()
 
