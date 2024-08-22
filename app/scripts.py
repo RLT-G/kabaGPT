@@ -2,6 +2,10 @@ import tiktoken
 import asyncio
 import config
 from docx import Document
+import aiosmtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+# from data.database.query import get_dialogue_history
 
 
 async def count_tokens(prompt: str, instructions: str) -> int:
@@ -20,6 +24,7 @@ async def count_tokens(prompt: str, instructions: str) -> int:
         return total_tokens
     except Exception as e:
         return -1 
+
 
 async def get_total_price(dialogue_model: str, token_count: int) -> float:
     model_1_input_token_price = float(config.OPENAI_MODEL['gpt-4o-mini']['input'])
@@ -68,3 +73,24 @@ async def delete_and_renumber(dialogues, n):
         renumbered_dialogues[str(i)] = value
     
     return renumbered_dialogues
+
+
+async def send_feedback_via_email(feedback, user_id):
+    email_sender = config.EMAIL_SENDER
+    email_password = config.EMAIL_PASSWORD
+    email_receivers = config.EMAIL_RECEIVERS.split(',')
+
+    subject = f"KabaGPT. Обратная связь от пользователя {user_id}."
+    body = feedback
+
+    for email_receiver in email_receivers:
+        msg = MIMEMultipart()
+        msg['From'] = email_sender
+        msg['To'] = email_receiver
+        msg['Subject'] = subject
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        async with aiosmtplib.SMTP(hostname="smtp.gmail.com", port=465, use_tls=True) as server:
+            await server.login(email_sender, email_password)
+            await server.send_message(msg)

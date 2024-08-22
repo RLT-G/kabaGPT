@@ -86,6 +86,16 @@ async def get_referral_balance(id: int):
             return referral_balance
         
 
+async def get_referral_user(id: int):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+
+        if user:
+            referral_user = str(user.referral_user)
+            return referral_user
+        
+
 async def set_balance(id: int, balance: str) -> tuple[str]:
     async with async_session() as session:
         result = await session.execute(select(User).where(User.id == id))
@@ -135,8 +145,8 @@ async def add_message_to_history(id: int, new_message: str, sender: str):
                 "sender": sender,
                 "message": new_message
             })
-            if len(history[str(current_dialog_index)]) > 10:
-                history[str(current_dialog_index)] = history[str(current_dialog_index)][2:]
+            # if len(history[str(current_dialog_index)]) > 10:
+            #     history[str(current_dialog_index)] = history[str(current_dialog_index)][2:]
             
             history = json.dumps(history, ensure_ascii=False)
 
@@ -146,7 +156,7 @@ async def add_message_to_history(id: int, new_message: str, sender: str):
             await session.commit()
 
 
-async def get_dialogue_history(id: int):
+async def get_dialogue_history(id: int, need_parse: bool = True) -> str | tuple[str]:
     async with async_session() as session:
         result = await session.execute(select(User).where(User.id == id))
         user = result.scalar_one_or_none()
@@ -154,18 +164,21 @@ async def get_dialogue_history(id: int):
         if user:
             message_history = json.loads(user.message_history or "{}")
             current_dialog_index = str(user.current_dialog_index)
+            
+            if need_parse:
+                if str(current_dialog_index) not in message_history:
+                    return None
 
-            if str(current_dialog_index) not in message_history:
-                return None
+                message_history = message_history[str(current_dialog_index)]
+                history = ''
+                for message in message_history:
+                    history += f"- {message.get('sender')}\n➖➖➖➖➖➖➖➖➖➖➖\n{message.get('message')}\n\n\n"
 
-            message_history = message_history[str(current_dialog_index)]
-            history = ''
-            for message in message_history:
-                history += f"- {message.get('sender')}\n➖➖➖➖➖➖➖➖➖➖➖\n{message.get('message')}\n\n\n"
-
-            if len(history) > 4000:
-                return history[len(history) - 4000::]
-            return history
+                if len(history) > 4000:
+                    return history[len(history) - 4000::]
+                return history
+            else:
+                return message_history, current_dialog_index
 
 
 async def increment_referral_count(id: int) -> None:
@@ -372,3 +385,78 @@ async def set_default_promts(id: int) -> None:
                 second_promt=DEFAULT_VALUES.get('second_promt'),
             ))
             await session.commit()
+
+
+async def get_messages_with_assistant(id: int, prompt: str, instructions: str, image_url: str | None = None) -> dict | None:
+    message_history, current_dialog_index = await get_dialogue_history(id=id, need_parse=False)
+
+    if str(current_dialog_index) not in message_history:
+        if image_url is not None:
+            messages = [
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]}
+            ] 
+        else:
+            messages = [
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": [
+                    {"type": "text", "text": prompt},
+                ]}
+            ] 
+            
+        return messages
+
+    message_history = message_history[str(current_dialog_index)]
+    messages = [
+        {"role": "system", "content": instructions}
+    ]
+
+    models = ['gpt-4o', 'gpt-4o-mini', 'dall-e-3']
+    first_user_is_added = False
+    last_is_user = None
+
+    for message in message_history:
+        if first_user_is_added:
+            if message.get('sender') in models and last_is_user:
+                messages.append({
+                    "role": "assistant",
+                    "content": message.get('message')
+                })
+                last_is_user = False
+
+            elif not (message.get('sender') in models) and not last_is_user:
+                messages.append({
+                    "role": "user",
+                    "content": [{"type": "text", "text": message.get('message')},]
+                })
+                last_is_user = True
+
+        else:
+            if not (message.get('sender') in models):
+                messages.append({
+                    "role": "user",
+                    "content": [{"type": "text", "text": message.get('message')},]
+                })
+
+                first_user_is_added = True
+                last_is_user = True
+
+    if image_url is not None:
+        messages.append({
+            "role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": image_url}}
+            ]
+        })
+
+    elif image_url is None:
+        messages.append({
+            "role": "user", "content": [
+                {"type": "text", "text": prompt},
+            ]
+        })
+
+    return messages

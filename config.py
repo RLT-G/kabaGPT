@@ -26,6 +26,14 @@ PRICE_MULTIPLIER = 5
 
 DEFAULT_LAUNGAGE = 'ru'
 
+EMAIL_SENDER = os.getenv('EMAIL_SENDER')
+
+EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
+
+EMAIL_RECEIVERS = os.getenv('EMAIL_RECEIVERS')
+
+AAI_TOKEN = os.getenv('AAI_TOKEN')
+
 OPENAI_MODEL = {
     'gpt-4o': {
         'Context window': '128,000 tokens',
