@@ -54,7 +54,7 @@ async def settings(laungage_code: str):
             [InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('first_promt'), callback_data='first_promt')],
             [InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('second_promt'), callback_data='second_promt')],
             [InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('see_promts'), callback_data='see_promts')],
-            [InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('set_default_promt'), callback_data='set_default_promt')],
+            # [InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('set_default_promt'), callback_data='set_default_promt')],
             [InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('back'), callback_data='to_more')],
         ]
     )

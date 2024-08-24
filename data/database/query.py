@@ -92,7 +92,7 @@ async def get_referral_user(id: int):
         user = result.scalar_one_or_none()
 
         if user:
-            referral_user = str(user.referral_user)
+            referral_user = int(user.referral_user)
             return referral_user
         
 
@@ -107,7 +107,34 @@ async def set_balance(id: int, balance: str) -> tuple[str]:
             ))
 
             await session.commit()
+
+
+async def referral_replenishment(id: int, price: float) -> tuple[str]:
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
         
+        if user:
+            referral_balance = float(user.referral_balance) + price
+            balance = float(user.balance) + price
+            
+            await session.execute(update(User).where(User.id == id).values(
+                balance=balance,
+                referral_balance=referral_balance
+            ))
+
+            await session.commit()
+        
+
+async def is_ther_a_user(id: int):
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == id))
+        user = result.scalar_one_or_none()
+        
+        if user:
+            return True
+        return False
+
 
 async def create_new_chat(id: int) -> tuple[str]:
     async with async_session() as session:

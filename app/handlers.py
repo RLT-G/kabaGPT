@@ -41,7 +41,9 @@ from data.database.query import (
     decrement_free_requests,
     add_message_to_history,
     get_dialogue_history,
-    get_referral_user
+    get_referral_user,
+    referral_replenishment,
+    is_ther_a_user
 )
 
 from data.outputs import answer_texts, default_answer_texts
@@ -76,9 +78,9 @@ async def cmd_start(message: types.Message, state: FSMContext):
     args = message.text.split()[1:]
     if args:
         referrer_id = int(args[0])
-        referral_user = get_referral_user(id=int(message.from_user.id))
+        not_new_user = await is_ther_a_user(int(message.from_user.id))
 
-        if int(referral_user) != 0 and referrer_id != int(message.from_user.id):
+        if not not_new_user:
             await increment_referral_count(id=referrer_id)
 
     else:
@@ -168,7 +170,7 @@ async def func(message: types.Message, state: FSMContext):
                     *await get_referral_data(id=int(message.from_user.id)
                 )
         ), 
-        parse_mode='html', 
+        parse_mode='Markdown', 
         reply_markup=await kb.referral(str(message.from_user.language_code))
     )
 
@@ -259,7 +261,12 @@ async def success_payment_handler(message: types.CallbackQuery, state: FSMContex
     user_id = int(message.from_user.id)
     balance = float(await get_balance(id=user_id))
     await set_balance(id=user_id, balance=str(balance + payment_amount))
-    
+    referral_user = await get_referral_user(id=int(message.from_user.id))
+
+    if int(referral_user) != 0: 
+        price = payment_amount * 0.1
+        await referral_replenishment(id=int(referral_user), price=price)
+
     await message.answer(text="Оплата прошла успешно")
 
 
@@ -514,6 +521,10 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
 # @router.callback_query('c_' in F.data)
 @router.callback_query(ContainsCallbackData(substring='c_'))
 async def func(callback: types.CallbackQuery, state: FSMContext):
+    sent_message = await callback.message.edit_text(
+        text="Обработка запроса...", 
+        parse_mode='html', 
+    )
 
     await set_current_dialog_index(
         id=int(callback.from_user.id), 
@@ -557,10 +568,6 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
                 )
 
             elif int(free_requests) != 0 and dialogue_model == 'gpt-4o-mini':
-                sent_message = await callback.message.edit_text(
-                    text="Обработка запроса...", 
-                    parse_mode='html', 
-                )
 
                 response = await fetch_chatgpt_response(
                     id=int(callback.from_user.id),
@@ -570,7 +577,6 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
                     image_url=image_url
 
                 )
-                await sent_message.delete()
 
                 await callback.message.answer(
                     text=f"{response}",
@@ -599,14 +605,9 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
 
         else:
             try:
-                sent_message = await callback.message.edit_text(
-                    text="Обработка запроса...", 
-                    parse_mode='html', 
-                )
 
                 if dialogue_model == 'dall-e-3':
                     link = await fetch_dalle_response(prompt=str(last_message))
-                    await sent_message.delete()
                     await callback.message.answer_photo(photo=link)
                     await set_balance(id=int(callback.from_user.id), balance=str(balance - total_price))
 
@@ -630,8 +631,6 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
                         image_url=image_url
                     )
 
-                    await sent_message.delete()
-
                     await callback.message.answer(
                         text=f"{response}", 
                         parse_mode='Markdown', 
@@ -651,6 +650,7 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
 
             except Exception as ex:
                 print(f'Ошибка в обработке запроса к OpenAI, {ex}')
+    await sent_message.delete()
 
 
 # @router.callback_query('d_' in F.data)
@@ -680,6 +680,10 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
 @router.message(States.chat)
 # @router.message(States.chat, content_types=[types.ContentType.TEXT, types.ContentType.DOCUMENT])
 async def func(message: types.Message, state: FSMContext):
+    sent_message = await message.answer(
+        text="Обработка запроса...", 
+        parse_mode='html', 
+    )
     text = message.caption if message.caption else message.text if message.text else ""
 
     if message.document:
@@ -744,10 +748,7 @@ async def func(message: types.Message, state: FSMContext):
             )
 
         elif int(free_requests) != 0 and dialogue_model == 'gpt-4o-mini':
-            sent_message = await message.answer(
-                text="Обработка запроса...", 
-                parse_mode='html', 
-            )
+
             response = await fetch_chatgpt_response(
                 id=int(message.from_user.id),
                 model=str(dialogue_model),
@@ -756,7 +757,6 @@ async def func(message: types.Message, state: FSMContext):
                 image_url=image_url
 
             )
-            await sent_message.delete()
 
             await message.answer(
                 text=f"{response}",
@@ -784,14 +784,9 @@ async def func(message: types.Message, state: FSMContext):
 
     else:
         try:
-            sent_message = await message.answer(
-                text="Обработка запроса...", 
-                parse_mode='html', 
-            )
 
             if dialogue_model == 'dall-e-3':
                 link = await fetch_dalle_response(prompt=str(text))
-                await sent_message.delete()
                 if 'http' in link:
                     await message.answer_photo(photo=link)
                     await set_balance(id=int(message.from_user.id), balance=str(balance - total_price))
@@ -818,7 +813,6 @@ async def func(message: types.Message, state: FSMContext):
                     image_url=image_url
                 )
 
-                await sent_message.delete()
                 await message.answer(
                     text=f"{response}", 
                     parse_mode='Markdown', 
@@ -838,6 +832,8 @@ async def func(message: types.Message, state: FSMContext):
 
         except Exception as ex:
             print(f'Ошибка в обработке запроса к OpenAI, {ex}')
+
+    await sent_message.delete()
 
 
 @router.callback_query(F.data == 'more')
@@ -1019,7 +1015,8 @@ async def func(callback: types.CallbackQuery):
             .get('see_promts')
             .format(*await get_promts(id=int(callback.from_user.id))
         ),
-        reply_markup=await kb.see_promts(str(callback.from_user.language_code))
+        reply_markup=await kb.see_promts(str(callback.from_user.language_code)),
+        parse_mode='html'
     )
     await callback.answer()
 
@@ -1036,6 +1033,11 @@ async def func(callback: types.CallbackQuery):
 
 @router.message()
 async def func(message: types.Message, state: FSMContext):
+    sent_message = await message.answer(
+        text="Обработка...", 
+        parse_mode='html', 
+    )
+
     await state.clear()
 
     dialogue_names = await get_dialogue_names(id=int(message.from_user.id))
@@ -1082,5 +1084,6 @@ async def func(message: types.Message, state: FSMContext):
         parse_mode='html', 
         reply_markup=await kb.dialogue(laungage_code=str(message.from_user.language_code), dialogue_names=dialogue_names, need_continue=True)
     )
+    await sent_message.delete()
     
 
