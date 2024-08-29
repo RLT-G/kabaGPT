@@ -123,7 +123,7 @@ async def dialogue(laungage_code: str, dialogue_names: list[str], need_continue:
     for d_index, name in enumerate(dialogue_names):
         builder.row(InlineKeyboardButton(text=name, callback_data=f"c_{d_index}" if need_continue else f"d_{d_index}"))
 
-    builder.row(InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('create_new_chat'), callback_data=f"create_new_chat"))
+    builder.row(InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('create_new_chat'), callback_data="c_n" if need_continue else "create_new_chat"))
     builder.row(InlineKeyboardButton(text=btn_texts.get(laungage_code, default_btn_texts).get('back'), callback_data=f"to_main"))
     
     return builder.as_markup()

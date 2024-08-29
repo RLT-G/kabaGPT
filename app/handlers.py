@@ -513,10 +513,18 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
         parse_mode='html', 
     )
 
+    if str(callback.data) == 'c_n':
+        chat_name, chat_model, c_index = await create_new_chat(id=int(callback.from_user.id))
+
+    else:
+        c_index = str(callback.data)[-1]
+
     await set_current_dialog_index(
         id=int(callback.from_user.id), 
-        current_dialog_index=int(str(callback.data)[-1])
+        current_dialog_index=int(c_index)
     )
+
+    await state.set_state(States.chat)
 
     previous_message = await state.get_data()
     last_message = previous_message.get('last_message', None)
@@ -539,7 +547,7 @@ async def func(callback: types.CallbackQuery, state: FSMContext):
         balance = float(await get_balance(id=int(callback.from_user.id)))
 
         if total_price > balance:
-            if int(free_requests) == 0:
+            if int(free_requests) == 0 or int(free_requests) < 0:
                 await callback.message.answer(
                     text=answer_texts.get(str(callback.from_user.language_code), default_answer_texts).get('not_money_not_limit'), 
                     parse_mode='html', 
@@ -778,7 +786,7 @@ async def func(message: types.Message, state: FSMContext):
     balance = float(await get_balance(id=int(message.from_user.id)))
 
     if total_price > balance:
-        if int(free_requests) == 0:
+        if int(free_requests) == 0 or int(free_requests) < 0:
             await message.answer(
                 text=answer_texts.get(str(message.from_user.language_code), default_answer_texts).get('not_money_not_limit'), 
                 parse_mode='html', 
