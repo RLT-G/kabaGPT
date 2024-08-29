@@ -140,9 +140,6 @@ DALL·E 3: {} генераций.
         'continue': 'В каком диалоге хотите продолжить?',
         'empty_history': 'История сообщений пуста'
     },
-    'en': {
-
-    }
 }
 
 default_answer_texts = answer_texts[config.DEFAULT_LAUNGAGE]
@@ -178,9 +175,6 @@ btn_texts = {
         'payment_2': 'Пополнить криптовалютой',
         'to_wallet': '💳 К пополнению'
     },
-    'en': {
-
-    }
 }
 
 default_btn_texts = btn_texts[config.DEFAULT_LAUNGAGE]

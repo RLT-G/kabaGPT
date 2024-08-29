@@ -366,6 +366,7 @@ async def set_dialog_name(id: int, dialog_name: str) -> None:
         user = result.scalar_one_or_none()
         
         if user:
+            if ',' in dialog_name: return
             current_dialog_index = int(user.current_dialog_index)
             dialog_titles = str(user.dialog_titles).split(', ')[0:-1]
             dialog_titles[current_dialog_index] = dialog_name

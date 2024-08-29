@@ -94,3 +94,18 @@ async def send_feedback_via_email(feedback, user_id):
         async with aiosmtplib.SMTP(hostname="smtp.gmail.com", port=465, use_tls=True) as server:
             await server.login(email_sender, email_password)
             await server.send_message(msg)
+
+
+def is_markdown_valid(text):
+    star_count = text.count('*')
+    underscore_count = text.count('_')
+    backtick_count = text.count('`')
+
+    if star_count % 2 != 0 or underscore_count % 2 != 0 or backtick_count % 2 != 0:
+        return False
+    
+    return True
+
+
+def split_text(text, max_length=4096):
+    return [text[i:i + max_length] for i in range(0, len(text), max_length)]
